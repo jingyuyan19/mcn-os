@@ -1,0 +1,51 @@
+{
+    "id": "mock-timeline-001",
+    "fps": 30,
+    "durationInFrames": 900,
+    "width": 1080,
+    "height": 1920,
+    "tracks": {
+        "video": [
+            {
+                "id": "clip-1",
+                "type": "video",
+                "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                "startFrame": 0,
+                "durationInFrames": 300,
+                "offset": 0
+            },
+            {
+                "id": "clip-2",
+                "type": "video",
+                "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+                "startFrame": 300,
+                "durationInFrames": 300,
+                "offset": 0
+            }
+        ],
+        "audio": [
+            {
+                "id": "audio-1",
+                "type": "audio",
+                "src": "https://www2.cs.uic.edu/~i101/SoundFiles/BabyElephantWalk60.wav",
+                "startFrame": 0,
+                "durationInFrames": 600
+            }
+        ],
+        "overlay": [
+            {
+                "id": "title-1",
+                "type": "text",
+                "content": "Digital MCN Demo",
+                "startFrame": 30,
+                "durationInFrames": 120,
+                "style": {
+                    "fontSize": 80,
+                    "color": "#ffffff",
+                    "top": 200,
+                    "fontFamily": "Inter"
+                }
+            }
+        ]
+    }
+}

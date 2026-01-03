@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # --- Orchestration Layer ---
+  postgres:
+    image: postgres:16
+    container_name: mcn_postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=n8n
+      - POSTGRES_PASSWORD=n8n_password
+      - POSTGRES_DB=n8n
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+    networks:
+      - mcn_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: mcn_redis
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - ./redis:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - mcn_network
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: mcn_n8n
+    restart: always
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=n8n_password
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=admin
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://localhost:5678/
+      # Timezone
+      - GENERIC_TIMEZONE=Asia/Shanghai
+    ports:
+      - "5678:5678"
+    volumes:
+      - ./n8n:/home/node/.n8n
+      - ./assets:/home/node/assets # Shared Asset Folder
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mcn_network
+
+  # --- Audio Layer (Phase 1.2) ---
+  cosyvoice:
+    image: cosyvoice:v3.0
+    container_name: mcn_cosyvoice
+    ports:
+      - "50000:50000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    volumes:
+      - ./assets:/opt/CosyVoice/assets
+      - ./cosyvoice_server_v3.py:/opt/CosyVoice/CosyVoice/runtime/python/fastapi/server.py
+    environment:
+      - PYTHONPATH=/opt/CosyVoice
+      - CUDA_HOME=/usr/local/cuda
+      - CUDA_VISIBLE_DEVICES=0
+      - DS_BUILD_OPS=0
+    command: /bin/bash -c "cd /opt/CosyVoice/CosyVoice/runtime/python/fastapi && python3 server.py --port 50000 --model_dir /opt/CosyVoice/assets/pretrained_models/Fun-CosyVoice3-0.5B-2512"
+    networks:
+      - mcn_network
+
+networks:
+  mcn_network:
+    driver: bridge

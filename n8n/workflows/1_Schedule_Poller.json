@@ -1,0 +1,140 @@
+{
+    "name": "MCN Schedule Poller (5min)",
+    "active": false,
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "minutes",
+                            "minutesInterval": 5
+                        }
+                    ]
+                }
+            },
+            "name": "Every 5 Minutes",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://4t6f8tmh.api.sanity.io/v2024-01-01/data/query/production",
+                "authentication": "none",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "query",
+                            "value": "*[_type == \"schedule\" && active == true] { ..., artist->, source_override[]-> }"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Fetch Schedules",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Sanity Schedule Matcher (Robust Edition)\n// Filters schedules that match the current time (UTC+8)\n\nconst now = new Date();\n// Adjust to Asia/Shanghai (UTC+8)\nconst utc8Time = new Date(now.getTime() + (8 * 60 * 60 * 1000));\n\nconst currentDay = utc8Time.getUTCDay(); // 0 (Sun) - 6 (Sat)\nconst currentDate = utc8Time.getUTCDate(); // 1 - 31\nconst currentHour = utc8Time.getUTCHours();\nconst currentMinute = utc8Time.getUTCMinutes();\n\n// Format current time HH:mm\nconst timeString = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;\nconsole.log(`Checking schedules for: ${timeString} (Day: ${currentDay}, Date: ${currentDate})`);\n\nconst dayMap = {\n  'sunday': 0,\n  'monday': 1,\n  'tuesday': 2,\n  'wednesday': 3,\n  'thursday': 4,\n  'friday': 5,\n  'saturday': 6\n};\n\nreturn items[0].json.result.filter(schedule => {\n  if (!schedule.active) return false;\n\n  // === 1. One-off Logic ===\n  if (schedule.type === 'one_off') {\n    // TODO: Compare trigger_at with current window\n    return false;\n  }\n  \n  // === 2. Routine Logic ===\n  if (schedule.type === 'routine') {\n    const config = schedule.routine_config;\n    if (!config) return false;\n\n    // A. Time Check (Does 'times' array contain current HH:mm?)\n    if (!config.times || !config.times.includes(timeString)) {\n       return false;\n    }\n\n    // B. Date/Day Check\n    if (config.period === 'weekly') {\n        // Check text days [monday, friday...]\n        if (!config.days || config.days.length === 0) return false;\n        const todayParams = Object.keys(dayMap).find(key => dayMap[key] === currentDay);\n        return config.days.includes(todayParams);\n    }\n\n    if (config.period === 'monthly') {\n        // Check numeric dates [1, 15, 30]\n        if (!config.month_days || config.month_days.length === 0) return false;\n        return config.month_days.includes(currentDate);\n    }\n  }\n  return false;\n});"
+            },
+            "name": "Filter Matching Schedules",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "boolean": [
+                        {
+                            "value1": "={{ $items.length > 0 }}",
+                            "value2": true
+                        }
+                    ]
+                }
+            },
+            "name": "Any Matches?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                850,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "requestMethod": "POST",
+                "url": "http://localhost:5678/webhook/generate-post",
+                "jsonParameters": true,
+                "options": {}
+            },
+            "name": "Trigger Post Generator",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                1050,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Every 5 Minutes": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Schedules",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Schedules": {
+            "main": [
+                [
+                    {
+                        "node": "Filter Matching Schedules",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Filter Matching Schedules": {
+            "main": [
+                [
+                    {
+                        "node": "Any Matches?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Any Matches?": {
+            "main": [
+                [
+                    {
+                        "node": "Trigger Post Generator",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

@@ -1,0 +1,5 @@
+assets/artists/**/*.png filter=lfs diff=lfs merge=lfs -text
+assets/artists/**/*.wav filter=lfs diff=lfs merge=lfs -text
+assets/sponsorships/**/*.pdf filter=lfs diff=lfs merge=lfs -text
+assets/**/*.psd filter=lfs diff=lfs merge=lfs -text
+assets/**/*.ai filter=lfs diff=lfs merge=lfs -text

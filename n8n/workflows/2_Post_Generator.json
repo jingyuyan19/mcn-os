@@ -1,0 +1,70 @@
+{
+    "name": "MCN Post Generator",
+    "active": true,
+    "id": "PRdRidLTGu06Av5a",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "generate-post",
+                "options": {}
+            },
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://4t6f8tmh.api.sanity.io/v2024-01-01/data/mutate/production",
+                "authentication": "none",
+                "requestMethod": "POST",
+                "sendHeaders": true,
+                "sendBody": true,
+                "specifyHeaders": "key-value",
+                "specifyBody": "json",
+                "headerParametersUi": {
+                    "parameter": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer skNfoTE6nT4cO7t9jj1fRtqL86MJyXKCvLpUWut3q0y1oZQwnQEHz5og38NrYtw7qj5VAeUgSGvDxQmVcgqJzzXrtdwfUrDLtF8GSr4MQ00DJLsTdNmfgkHjmynoiPqrUPEAWeBbIf2bsHS5fezjBqUnnwjMtzQmCcxmCOsVsNFTAE5kBvXP"
+                        }
+                    ]
+                },
+                "jsonParameters": true,
+                "options": {},
+                "bodyParametersUi": {
+                    "parameter": [
+                        {
+                            "name": "mutations",
+                            "value": "=[{\"create\":{\"_type\":\"post\",\"title\":\"AI Generated Video: {{ $json.body.schedule.title }}\",\"status\":\"draft\",\"artist\":{\"_type\":\"reference\",\"_ref\":\"{{ $json.body.schedule.artist._ref }}\"},\"created_from_schedule\":{\"_type\":\"reference\",\"_ref\":\"{{ $json.body.schedule._id }}\"}}}]"
+                        }
+                    ]
+                }
+            },
+            "name": "Create Sanity Post",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                650,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Create Sanity Post",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

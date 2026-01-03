@@ -1,0 +1,87 @@
+{
+    "1": {
+        "inputs": {
+            "ckpt_name": "flux1-dev-fp8.safetensors",
+            "weight_dtype": "fp8_e4m3fn"
+        },
+        "class_type": "CheckpointLoaderSimple"
+    },
+    "3": {
+        "inputs": {
+            "seed": "{{SEED}}",
+            "steps": 20,
+            "cfg": 1,
+            "sampler_name": "euler",
+            "scheduler": "simple",
+            "denoise": 1,
+            "model": [
+                "1",
+                0
+            ],
+            "positive": [
+                "6",
+                0
+            ],
+            "negative": [
+                "7",
+                0
+            ],
+            "latent_image": [
+                "5",
+                0
+            ]
+        },
+        "class_type": "KSampler"
+    },
+    "5": {
+        "inputs": {
+            "width": 896,
+            "height": 1152,
+            "batch_size": 1
+        },
+        "class_type": "EmptyLatentImage"
+    },
+    "6": {
+        "inputs": {
+            "text": "{{POSITIVE_PROMPT}}",
+            "clip": [
+                "1",
+                1
+            ]
+        },
+        "class_type": "CLIPTextEncode"
+    },
+    "7": {
+        "inputs": {
+            "text": "low quality, bad anatomy, worst quality",
+            "clip": [
+                "1",
+                1
+            ]
+        },
+        "class_type": "CLIPTextEncode"
+    },
+    "8": {
+        "inputs": {
+            "samples": [
+                "3",
+                0
+            ],
+            "vae": [
+                "1",
+                2
+            ]
+        },
+        "class_type": "VAEDecode"
+    },
+    "9": {
+        "inputs": {
+            "filename_prefix": "Flux_API_{{TASK_ID}}",
+            "images": [
+                "8",
+                0
+            ]
+        },
+        "class_type": "SaveImage"
+    }
+}

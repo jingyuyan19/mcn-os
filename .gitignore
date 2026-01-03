@@ -1,0 +1,45 @@
+# --- 1. System & Dependencies ---
+.DS_Store
+node_modules/
+__pycache__/
+.venv/
+venv/
+*.log
+wget-log
+.vscode/
+.idea/
+
+# --- 2. Secrets ---
+.env
+sanity-studio/.sanity/
+*private_key*
+
+# --- 3. Massive Installations (Repo-in-Repo) ---
+visual/ComfyUI/       # Ignored entirely! We rebuild via setup_nodes.sh
+CosyVoice/
+visual/active_test_output.wav
+
+# --- 4. Database Persistence (Docker Volumes) ---
+postgres/
+redis/
+n8n/binaryData/
+n8n/git/
+n8n/ssh/
+n8n/config
+n8n/nodes
+
+# --- 5. Massive Assets ---
+# We track specific assets via LFS, ignore the rest
+assets/models/
+assets/pretrained_models/
+assets/temp/
+outputs/
+*.safetensors
+*.ckpt
+*.pth
+*.bin
+
+# --- 6. Exceptions (Whitelist) ---
+!assets/.gitkeep
+!n8n/workflows/*.json
+models/
