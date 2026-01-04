@@ -111,8 +111,17 @@ def execute_workflow(template_name, params):
             if msg['type'] == 'executed' and msg['data']['prompt_id'] == prompt_id:
                 outputs = msg['data']['output']
                 for nid, content in outputs.items():
-                    for item in content.get('gifs', []) + content.get('images', []) + content.get('videos', []):
-                         output_files.append(item) # Keep full item dict (filename, subfolder, type)
+                    if isinstance(content, list):
+                        # Some nodes return a list directly
+                        for item in content:
+                            if isinstance(item, dict):
+                                output_files.append(item)
+                    elif isinstance(content, dict):
+                         # Standard format: { "images": [...], "gifs": [...] }
+                         for key in ['images', 'gifs', 'videos']:
+                             if key in content:
+                                 for item in content[key]:
+                                     output_files.append(item)
     
     ws.close()
     return output_files

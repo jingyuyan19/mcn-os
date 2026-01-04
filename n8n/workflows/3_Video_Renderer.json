@@ -1,0 +1,280 @@
+{
+    "name": "MCN Video Renderer (GPU)",
+    "active": false,
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "render-video",
+                "options": {}
+            },
+            "name": "Sanity Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://172.17.0.1:8000/submit_task",
+                "sendBody": true,
+                "specifyBody": "json",
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "task_type",
+                            "value": "comfyui"
+                        },
+                        {
+                            "name": "priority",
+                            "value": 100
+                        },
+                        {
+                            "name": "payload",
+                            "value": "={{ {\"template\": \"flux_dev\", \"params\": { \"POSITIVE_PROMPT\": $json.body.storyboard[0].ai_prompt, \"SEED\": Math.floor(Math.random() * 10000000) }} }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Submit to GPU",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "values": {
+                    "number": [
+                        {
+                            "name": "retries",
+                            "value": 0
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Init Loop",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 1,
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "amount": 10,
+                "unit": "seconds"
+            },
+            "name": "Wait 10s",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1,
+            "position": [
+                850,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "=http://172.17.0.1:8000/status/{{ $node[\"Submit to GPU\"].json.task_id }}",
+                "options": {}
+            },
+            "name": "Check Status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                1050,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{ $json.status }}",
+                            "value2": "completed"
+                        }
+                    ]
+                }
+            },
+            "name": "Is Complete?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                1250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const retries = $node[\"Init Loop\"].json.retries + 1;\nreturn { json: { retries } };"
+            },
+            "name": "Increment Retry",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                1250,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "number": [
+                        {
+                            "value1": "={{ $json.retries }}",
+                            "operation": "larger",
+                            "value2": 60
+                        }
+                    ]
+                }
+            },
+            "name": "Max Retries?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                1050,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "=https://4t6f8tmh.api.sanity.io/v2024-01-01/data/mutate/production",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer skNfoTE6nT4cO7t9jj1fRtqL86MJyXKCvLpUWut3q0y1oZQwnQEHz5og38NrYtw7qj5VAeUgSGvDxQmVcgqJzzXrtdwfUrDLtF8GSr4MQ00DJLsTdNmfgkHjmynoiPqrUPEAWeBbIf2bsHS5fezjBqUnnwjMtzQmCcxmCOsVsNFTAE5kBvXP"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "mutations",
+                            "value": "=[{\"patch\":{\"id\":\"{{ $node[\"Sanity Webhook\"].json.body._id }}\",\"set\":{\"status\":\"done\",\"feedback\":\"Rendered at {{ new Date().toISOString() }}\"}}}]"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Update Sanity (Success)",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                1500,
+                200
+            ]
+        }
+    ],
+    "connections": {
+        "Sanity Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Submit to GPU",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Submit to GPU": {
+            "main": [
+                [
+                    {
+                        "node": "Init Loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Init Loop": {
+            "main": [
+                [
+                    {
+                        "node": "Wait 10s",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Wait 10s": {
+            "main": [
+                [
+                    {
+                        "node": "Check Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check Status": {
+            "main": [
+                [
+                    {
+                        "node": "Is Complete?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is Complete?": {
+            "main": [
+                [
+                    {
+                        "node": "Update Sanity (Success)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Max Retries?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Max Retries?": {
+            "main": [
+                [],
+                [
+                    {
+                        "node": "Increment Retry",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Increment Retry": {
+            "main": [
+                [
+                    {
+                        "node": "Wait 10s",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

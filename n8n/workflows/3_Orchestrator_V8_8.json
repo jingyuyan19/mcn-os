@@ -1,0 +1,373 @@
+{
+    "name": "3_Orchestrator_V8_8",
+    "nodes": [
+        {
+            "parameters": {},
+            "name": "On Click",
+            "type": "n8n-nodes-base.manualTrigger",
+            "typeVersion": 1,
+            "position": [
+                220,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "https://4t6f8tmh.api.sanity.io/v2024-01-01/data/query/production",
+                "authentication": "none",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "query",
+                            "value": "*[_type == \"prompt_config\"]"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Fetch Prompts",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                420,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const results = items[0].json.result;\nreturn { json: { prompts: { analyst: results.find(p => p.role === 'Analyst')?.template || 'Error', writer: results.find(p => p.role === 'Writer')?.template || 'Error', director: results.find(p => p.role === 'Director')?.template || 'Error' }, input: { source_type: 'Tech News', content: 'INPUT: Apple Vision Pro sales down 50%.' } } };"
+            },
+            "name": "Setup Context",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                620,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const ctx = $('Setup Context').first().json;\nlet p = ctx.prompts.analyst.replace('{{source_type}}', ctx.input.source_type);\nreturn { json: { model: 'deepseek-chat', messages: [{ role: 'system', content: p }, { role: 'user', content: ctx.input.content }], temperature: 1.3 } };"
+            },
+            "name": "Prep Analyst",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                820,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.deepseek.com/chat/completions",
+                "authentication": "none",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer sk-4756665d490f43d59223ab9567be34c8"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "model",
+                            "value": "deepseek-chat"
+                        },
+                        {
+                            "name": "messages",
+                            "value": "={{$json.messages}}"
+                        },
+                        {
+                            "name": "temperature",
+                            "value": "={{$json.temperature}}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Analyst API",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1020,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const ctx = $('Setup Context').first().json;\nconst out = items[0].json.choices[0].message.content;\nlet p = ctx.prompts.writer.replace('{{artist_name}}', 'Luna').replace('{{artist_persona}}', 'Sarcastic').replace('{{post_type}}', 'routine').replace('{{usp}}', 'None');\nreturn { json: { model: 'deepseek-chat', messages: [{ role: 'system', content: p }, { role: 'user', content: out }], temperature: 1.3 } };"
+            },
+            "name": "Prep Writer",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1220,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.deepseek.com/chat/completions",
+                "authentication": "none",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer sk-4756665d490f43d59223ab9567be34c8"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "model",
+                            "value": "deepseek-chat"
+                        },
+                        {
+                            "name": "messages",
+                            "value": "={{$json.messages}}"
+                        },
+                        {
+                            "name": "temperature",
+                            "value": "={{$json.temperature}}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Writer API",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1420,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const ctx = $('Setup Context').first().json;\nconst out = items[0].json.choices[0].message.content;\nreturn { json: { model: 'deepseek-chat', messages: [{ role: 'system', content: ctx.prompts.director }, { role: 'user', content: out }], temperature: 1.3 } };"
+            },
+            "name": "Prep Director",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1620,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.deepseek.com/chat/completions",
+                "authentication": "none",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer sk-4756665d490f43d59223ab9567be34c8"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "model",
+                            "value": "deepseek-chat"
+                        },
+                        {
+                            "name": "messages",
+                            "value": "={{$json.messages}}"
+                        },
+                        {
+                            "name": "temperature",
+                            "value": "={{$json.temperature}}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Director API",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1820,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Editor Logic V8.8: RELATIVE PATHS ONLY\nconst content = items[0].json.choices[0].message.content;\nconst cleanJson = content.replace(/```json/g, '').replace(/```/g, '');\nlet plan = [];\ntry { plan = JSON.parse(cleanJson); } catch(e) { plan = [{id:1, script:'Parse Error', type:'avatar'}]; }\n\nconst fps = 30;\nconst totalFrames = 60 * fps; // 60 seconds\nconst totalChars = plan.reduce((s, shot) => s + (shot.script?.length || 0), 0);\nlet currentFrame = 0;\nconst clips = [];\n\n// BASE LAYER: Use RELATIVE path (Composition.tsx will prepend ASSET_HOST)\nclips.push({ type: 'avatar', src: 'videos/avatar_default.mp4', startFrame: 0, durationFrames: totalFrames, layer: 0 });\n\nplan.forEach((shot, i) => {\n  if (!shot.script) return;\n  const weight = (shot.script.length || 1) / (totalChars || 1);\n  let dur = Math.round(totalFrames * weight);\n  if (i === plan.length - 1) dur = totalFrames - currentFrame;\n  if (shot.type !== 'avatar' && shot.type !== 'A-Roll') {\n    // RELATIVE path for B-Roll\n    clips.push({ type: shot.type, src: shot.manual_asset || 'videos/broll_placeholder.mp4', startFrame: currentFrame, durationFrames: dur, layer: 10, style: { objectFit: 'cover' } });\n  }\n  currentFrame += dur;\n});\n\nreturn { json: { task_type: 'remotion_render', priority: 50, payload: { timeline: { width: 1080, height: 1920, fps: 30, durationInFrames: totalFrames, clips: clips, subtitles: [] } } } };"
+            },
+            "name": "Editor Logic",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2020,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://172.17.0.1:8000/submit_task",
+                "authentication": "none",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify($json) }}",
+                "options": {}
+            },
+            "name": "Submit Render Task",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2220,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "On Click": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Prompts",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Prompts": {
+            "main": [
+                [
+                    {
+                        "node": "Setup Context",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Setup Context": {
+            "main": [
+                [
+                    {
+                        "node": "Prep Analyst",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prep Analyst": {
+            "main": [
+                [
+                    {
+                        "node": "Analyst API",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Analyst API": {
+            "main": [
+                [
+                    {
+                        "node": "Prep Writer",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prep Writer": {
+            "main": [
+                [
+                    {
+                        "node": "Writer API",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Writer API": {
+            "main": [
+                [
+                    {
+                        "node": "Prep Director",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prep Director": {
+            "main": [
+                [
+                    {
+                        "node": "Director API",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Director API": {
+            "main": [
+                [
+                    {
+                        "node": "Editor Logic",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Editor Logic": {
+            "main": [
+                [
+                    {
+                        "node": "Submit Render Task",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

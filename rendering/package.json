@@ -1,35 +1,29 @@
 {
-  "name": "rendering",
+  "name": "mcn-rendering",
   "version": "1.0.0",
-  "description": "My Remotion video",
-  "repository": {},
-  "license": "UNLICENSED",
-  "private": true,
+  "description": "CPU-based Remotion Render Engine for Digital MCN",
+  "scripts": {
+    "start": "remotion preview src/index.tsx",
+    "build": "remotion build src/index.tsx out/video.mp4",
+    "render": "ts-node render_cli.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "dependencies": {
-    "@remotion/cli": "4.0.397",
-    "@remotion/zod-types": "4.0.397",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "remotion": "4.0.397",
-    "zod": "3.22.3",
-    "@remotion/tailwind-v4": "4.0.397",
-    "tailwindcss": "4.0.0"
+    "@fontsource/noto-sans-sc": "^5.2.8",
+    "@remotion/bundler": "^4.0.222",
+    "@remotion/cli": "^4.0.222",
+    "@remotion/renderer": "^4.0.222",
+    "@remotion/zod-types": "^4.0.222",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "remotion": "4.0.222",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@remotion/eslint-config-flat": "4.0.397",
-    "@types/react": "19.2.7",
-    "@types/web": "0.0.166",
-    "eslint": "9.19.0",
-    "prettier": "3.6.0",
-    "typescript": "5.9.3"
-  },
-  "scripts": {
-    "dev": "remotion studio",
-    "build": "remotion bundle",
-    "upgrade": "remotion upgrade",
-    "lint": "eslint src && tsc"
-  },
-  "sideEffects": [
-    "*.css"
-  ]
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.0",
+    "@types/web": "^0.0.137",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
 }

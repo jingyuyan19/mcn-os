@@ -9,6 +9,12 @@ wget-log
 .vscode/
 .idea/
 
+# --- Generated Output (Don't commit renders) ---
+assets/output/
+assets/videos/
+middleware/assets/
+test_*.json
+
 # --- 2. Secrets ---
 .env
 sanity-studio/.sanity/
