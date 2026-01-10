@@ -1,0 +1,72 @@
+{
+    "name": "PROXY_TEST",
+    "nodes": [
+        {
+            "parameters": {},
+            "id": "1",
+            "name": "Manual Trigger",
+            "type": "n8n-nodes-base.manualTrigger",
+            "position": [
+                250,
+                300
+            ],
+            "typeVersion": 1
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://crawl4ai:11235/crawl",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "{\n  \"urls\": [\"https://openai.com/news/\"],\n  \"word_count_threshold\": 50,\n  \"magic\": true,\n  \"page_timeout\": 30000\n}"
+            },
+            "id": "2",
+            "name": "Without Proxy",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                500,
+                200
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://crawl4ai:11235/crawl",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "{\n  \"urls\": [\"https://httpbin.org/ip\"],\n  \"word_count_threshold\": 1,\n  \"magic\": true,\n  \"page_timeout\": 30000,\n  \"crawler_params\": {\n    \"proxy_config\": {\n      \"server\": \"http://172.17.0.1:7897\"\n    }\n  }\n}"
+            },
+            "id": "3",
+            "name": "With Proxy",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                500,
+                400
+            ],
+            "typeVersion": 4.2
+        }
+    ],
+    "connections": {
+        "Manual Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Without Proxy",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "With Proxy",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {},
+    "staticData": null,
+    "tags": [],
+    "triggerCount": 0
+}

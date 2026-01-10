@@ -1,0 +1,132 @@
+# CosyVoice Docker Image with CUDA 12.1 (Compatible with 4090 + Driver 535)
+# Base: PyTorch 2.1.2 + CUDA 12.1 + cuDNN 8
+FROM pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime
+
+WORKDIR /app
+
+# Set non-interactive frontend to avoid prompts during build
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Shanghai
+
+# Proxy for git and pip (Docker bridge gateway - Clash Verge on host)
+ARG PROXY_HOST=172.17.0.1
+ARG PROXY_PORT=7897
+
+# 1. Install system dependencies (CosyVoice requires sox and ffmpeg)
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
+    sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y \
+    git \
+    ffmpeg \
+    sox \
+    libsox-dev \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Clone CosyVoice repository WITH proxy for GitHub access
+RUN git config --global http.proxy http://${PROXY_HOST}:${PROXY_PORT} && \
+    git config --global https.proxy http://${PROXY_HOST}:${PROXY_PORT} && \
+    git clone --recursive https://github.com/FunAudioLLM/CosyVoice.git . && \
+    git config --global --unset http.proxy && \
+    git config --global --unset https.proxy
+
+# 3. Prepare requirements - remove hash constraints
+RUN python3 -c "import re; f=open('requirements.txt','r'); c=f.read(); f.close(); \
+    c=re.sub(r' \\\\\n.*--hash=sha256:[a-f0-9]+', '', c); \
+    c=re.sub(r' --hash=sha256:[a-f0-9]+', '', c); \
+    c=re.sub(r'^--hash=sha256:[a-f0-9]+\n', '', c, flags=re.MULTILINE); \
+    f=open('requirements.txt','w'); f.write(c); f.close(); print('Hash constraints removed')"
+
+# Set proxy for all pip installs
+ENV HTTP_PROXY=http://172.17.0.1:7897
+ENV HTTPS_PROXY=http://172.17.0.1:7897
+ENV http_proxy=http://172.17.0.1:7897
+ENV https_proxy=http://172.17.0.1:7897
+
+# Upgrade pip to avoid hash checking issues
+RUN pip install --upgrade pip
+
+# 4a. Install CHUNK 1: Core dependencies (lines 3-12)
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    conformer==0.3.2 \
+    deepspeed==0.15.1 \
+    diffusers==0.29.0 \
+    fastapi==0.115.6 \
+    fastapi-cli==0.0.4 \
+    gdown==5.1.0 \
+    gradio==5.4.0 \
+    grpcio==1.57.0 \
+    grpcio-tools==1.57.0 \
+    hydra-core==1.3.2
+
+# 4b. Install CHUNK 2: ML dependencies (lines 13-22)
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    HyperPyYAML==1.2.2 \
+    inflect==7.3.1 \
+    librosa==0.10.2 \
+    lightning==2.2.4 \
+    matplotlib==3.7.5 \
+    modelscope==1.20.0 \
+    networkx==3.1 \
+    numpy==1.26.4 \
+    omegaconf==2.3.0 \
+    onnx==1.16.0
+
+# Fix: Downgrade ruamel.yaml to avoid 'max_depth' compatibility issue with hyperpyyaml
+# Use main PyPI as Tsinghua mirror doesn't have older versions
+RUN pip install --no-cache-dir "ruamel.yaml>=0.17.28,<0.18"
+
+# 4c. Install CHUNK 3: ONNX Runtime GPU (big package - 200MB)
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    onnxruntime-gpu==1.18.0
+
+# 4d. Install CHUNK 4: Audio/Media dependencies (lines 24-32)
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    openai-whisper==20231117 \
+    protobuf==4.25 \
+    pyarrow==18.1.0 \
+    pydantic==2.7.0 \
+    pyworld==0.3.4 \
+    rich==13.7.1 \
+    soundfile==0.12.1 \
+    tensorboard==2.14.0
+
+# 4e. Install CHUNK 5: TensorRT and Torch (needs NVIDIA PyPI for TensorRT)
+RUN pip install --no-cache-dir \
+    -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    --extra-index-url https://pypi.nvidia.com \
+    tensorrt-cu12==10.3.0 \
+    tensorrt-cu12-bindings==10.3.0 \
+    tensorrt-cu12-libs==10.3.0 \
+    torch==2.3.1 \
+    torchaudio==2.3.1
+
+# 4f. Install CHUNK 6: Transformers and utilities (lines 39-43)
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    transformers==4.40.0 \
+    x-transformers==1.27.19 \
+    uvicorn==0.30.0 \
+    wetext==0.0.4 \
+    wget==3.2
+
+# 5. Install FastAPI server dependencies
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    python-multipart
+
+# Clear proxy for runtime
+ENV HTTP_PROXY=""
+ENV HTTPS_PROXY=""
+ENV http_proxy=""
+ENV https_proxy=""
+
+# Upgrade pip to avoid hash checking issues
+RUN pip install --upgrade pip
+
+# 6. Copy our custom server script
+COPY cosyvoice_server_v3.py /app/runtime/python/fastapi/server.py
+
+# 7. Expose port
+EXPOSE 50000
+
+# 8. Default command
+CMD ["python3", "runtime/python/fastapi/server.py", "--port", "50000", "--model_dir", "/models/Fun-CosyVoice3-0.5B-2512"]

@@ -1,0 +1,79 @@
+# Dockerfile.cuda12 - Golden Environment for CosyVoice v3 on RTX 4090
+# Base: NVIDIA CUDA 12.2 Development (Includes nvcc for DeepSpeed compilation)
+FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
+
+# Prevent interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV TORCH_CUDA_ARCH_LIST="8.9"
+
+# Install System Dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    vim \
+    ffmpeg \
+    sox \
+    libsox-dev \
+    build-essential \
+    cmake \
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y \
+    python3.10 \
+    python3.10-dev \
+    python3.10-venv \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Symlink python3 to python
+RUN ln -s /usr/bin/python3.10 /usr/bin/python
+
+# Pip Setup
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
+
+# Working Directory
+WORKDIR /opt/CosyVoice
+
+# Clone Repository (Recursive for Matcha-TTS)
+# Using generic master branch as per user spec, but CosyVoice v3 code is in master now.
+RUN git clone --recursive https://github.com/FunAudioLLM/CosyVoice.git .
+
+# --- PHASE 1: Install Core Torch Stack (CUDA 12 Native) ---
+# PyTorch 2.1.2 selected for stability with CUDA 12.1
+RUN pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu121
+
+# --- PHASE 2: Install ONNX Runtime GPU (CUDA 12 Linkage) ---
+# Force install from Azure/NVIDIA index to get libcublasLt.so.12 linkage
+RUN pip install onnxruntime-gpu>=1.17.0 \
+    --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/
+
+# --- PHASE 3: Install Pinned Dependencies (Deep Research Findings) ---
+# Transformers 4.51.3 fixes "Distortion/Trembling"
+# Pynini required for text normalization
+RUN pip install transformers==4.51.3 pynini==2.1.5 modelscope
+
+# --- PHASE 4: Compile Requirements (DeepSpeed / FlashAttn) ---
+# Pre-install packaging/ninja to help build
+RUN pip install packaging ninja
+# Install requirements line by line to isolate build failures
+# Removing some requirements that might conflict or we already installed
+RUN sed -i '/torch/d' requirements.txt && \
+    sed -i '/onnxruntime/d' requirements.txt && \
+    pip install -r requirements.txt
+
+# --- PHASE 5: Bake-in Patches ---
+# Patch 1: Increase Flow Steps 10 -> 50 (High Quality)
+RUN sed -i 's/n_timesteps=.*,/n_timesteps=50,/g' /opt/CosyVoice/cosyvoice/flow/flow.py && \
+    grep "n_timesteps=50" /opt/CosyVoice/cosyvoice/flow/flow.py
+
+# --- PHASE 6: Runtime Setup ---
+ENV PYTHONPATH=/opt/CosyVoice
+ENV PRETRAINED_MODEL_DIR=/models/Fun-CosyVoice3-0.5B-2512
+
+# Copy Server Script (If using custom script, or use repo default)
+# We will use the repo default server but expose our custom runner if needed.
+# For now, default CMD matches docker-compose expectation.
+
+CMD ["python3", "runtime/python/fastapi/server.py", "--port", "50000", "--model_dir", "FunAudioLLM/CosyVoice3-0.5B-2512"]

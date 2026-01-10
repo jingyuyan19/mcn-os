@@ -1,0 +1,200 @@
+{
+    "name": "Debug_Switch_Routing",
+    "nodes": [
+        {
+            "parameters": {},
+            "id": "1",
+            "name": "Manual Trigger",
+            "type": "n8n-nodes-base.manualTrigger",
+            "position": [
+                250,
+                300
+            ],
+            "typeVersion": 1
+        },
+        {
+            "parameters": {
+                "jsCode": "// Create test items with different pipeline values\nreturn [\n  { json: { name: 'YouTube Item', pipeline: 'youtube' } },\n  { json: { name: 'Twitter Item', pipeline: 'twitter' } },\n  { json: { name: 'Web Item', pipeline: 'web' } }\n];"
+            },
+            "id": "2",
+            "name": "Create Test Data",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                470,
+                300
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "rules": {
+                    "values": [
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict"
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "cond1",
+                                        "leftValue": "={{ $json.pipeline }}",
+                                        "rightValue": "youtube",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputLabel": "YouTube"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict"
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "cond2",
+                                        "leftValue": "={{ $json.pipeline }}",
+                                        "rightValue": "twitter",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputLabel": "Twitter"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict"
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "cond3",
+                                        "leftValue": "={{ $json.pipeline }}",
+                                        "rightValue": "web",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputLabel": "Web"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "3",
+            "name": "Route Switch",
+            "type": "n8n-nodes-base.switch",
+            "position": [
+                690,
+                300
+            ],
+            "typeVersion": 3
+        },
+        {
+            "parameters": {},
+            "id": "4",
+            "name": "YouTube Output",
+            "type": "n8n-nodes-base.noOp",
+            "position": [
+                910,
+                100
+            ],
+            "typeVersion": 1
+        },
+        {
+            "parameters": {},
+            "id": "5",
+            "name": "Twitter Output",
+            "type": "n8n-nodes-base.noOp",
+            "position": [
+                910,
+                300
+            ],
+            "typeVersion": 1
+        },
+        {
+            "parameters": {},
+            "id": "6",
+            "name": "Web Output",
+            "type": "n8n-nodes-base.noOp",
+            "position": [
+                910,
+                500
+            ],
+            "typeVersion": 1
+        }
+    ],
+    "connections": {
+        "Manual Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Create Test Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Create Test Data": {
+            "main": [
+                [
+                    {
+                        "node": "Route Switch",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Route Switch": {
+            "main": [
+                [
+                    {
+                        "node": "YouTube Output",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Twitter Output",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Web Output",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

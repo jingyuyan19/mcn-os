@@ -1,0 +1,53 @@
+{
+    "name": "DEEP_CRAWL_TEST",
+    "nodes": [
+        {
+            "parameters": {},
+            "id": "1",
+            "name": "Manual Trigger",
+            "type": "n8n-nodes-base.manualTrigger",
+            "position": [
+                250,
+                300
+            ],
+            "typeVersion": 1
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "=http://crawl4ai:11235/crawl?t={{ Date.now() }}",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "{\n  \"urls\": [\"https://openai.com/news/\"],\n  \"browser_config\": {\n    \"type\": \"BrowserConfig\",\n    \"params\": {\n      \"headless\": true\n    }\n  },\n  \"crawler_config\": {\n    \"type\": \"CrawlerRunConfig\",\n    \"params\": {\n      \"stream\": false,\n      \"session_id\": \"n8n_test_{{ $now.toMillis() }}\",\n      \"word_count_threshold\": 50,\n      \"magic\": true,\n      \"page_timeout\": 120000,\n      \"cache_mode\": \"BYPASS\",\n      \"deep_crawl_strategy\": {\n        \"type\": \"BestFirstCrawlingStrategy\",\n        \"params\": {\n          \"max_depth\": 1,\n          \"max_pages\": 10,\n          \"include_external\": false,\n          \"url_scorer\": {\n            \"type\": \"KeywordRelevanceScorer\",\n            \"params\": {\n              \"keywords\": [\"news\", \"article\", \"blog\", \"index\", \"announcement\", \"post\"],\n              \"weight\": 0.7\n            }\n          }\n        }\n      }\n    }\n  }\n}",
+                "options": {
+                    "timeout": 300000
+                }
+            },
+            "id": "2",
+            "name": "Deep Crawl OpenAI News",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                500,
+                300
+            ],
+            "typeVersion": 4.2
+        }
+    ],
+    "connections": {
+        "Manual Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Deep Crawl OpenAI News",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {},
+    "staticData": null,
+    "tags": [],
+    "triggerCount": 0
+}

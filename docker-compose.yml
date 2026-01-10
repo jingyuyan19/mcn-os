@@ -48,11 +48,23 @@ services:
       - WEBHOOK_URL=http://localhost:5678/
       # Timezone
       - GENERIC_TIMEZONE=Asia/Shanghai
+      # Allow env var access in expressions
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      # Whitelist env vars for task runners (n8n v2.0+)
+      - N8N_RUNNERS_TASK_ENV_ALLOW_LIST=SANITY_PROJECT_ID,SANITY_API_TOKEN,DEEPSEEK_API_KEY
+      # Sanity CMS
+      - SANITY_PROJECT_ID=4t6f8tmh
+      - SANITY_API_TOKEN=skNfoTE6nT4cO7t9jj1fRtqL86MJyXKCvLpUWut3q0y1oZQwnQEHz5og38NrYtw7qj5VAeUgSGvDxQmVcgqJzzXrtdwfUrDLtF8GSr4MQ00DJLsTdNmfgkHjmynoiPqrUPEAWeBbIf2bsHS5fezjBqUnnwjMtzQmCcxmCOsVsNFTAE5kBvXP
+      # DeepSeek AI
+      - DEEPSEEK_API_KEY=sk-4756665d490f43d59223ab9567be34c8
+      # n8n v2.0+ File Access Allowlist (semicolon-separated, NOT colons)
+      # Required for readWriteFile node to write to custom mount paths
+      - N8N_RESTRICT_FILE_ACCESS_TO=/home/node/.n8n;/opt/mcn/assets;/tmp
     ports:
       - "5678:5678"
     volumes:
       - ./n8n:/home/node/.n8n
-      - ./assets:/home/node/assets # Shared Asset Folder
+      - ./assets:/opt/mcn/assets # Unified Asset Path
     depends_on:
       - postgres
       - redis
@@ -61,8 +73,9 @@ services:
 
   # --- Audio Layer (Phase 1.2) ---
   cosyvoice:
-    image: cosyvoice:v3.0
+    image: cosyvoice:v3-vpn
     container_name: mcn_cosyvoice
+    restart: always
     ports:
       - "50000:50000"
     deploy:
@@ -73,14 +86,20 @@ services:
               count: 1
               capabilities: [ gpu ]
     volumes:
-      - ./assets:/opt/CosyVoice/assets
-      - ./cosyvoice_server_v3.py:/opt/CosyVoice/CosyVoice/runtime/python/fastapi/server.py
+      # Mount models directory (reuse existing models, don't bake into image)
+      - ./assets/pretrained_models:/models:ro
+      # Cache for modelscope downloads (wetext, etc.)
+      - cosyvoice_cache:/root/.cache/modelscope
     environment:
-      - PYTHONPATH=/opt/CosyVoice
-      - CUDA_HOME=/usr/local/cuda
       - CUDA_VISIBLE_DEVICES=0
-      - DS_BUILD_OPS=0
-    command: /bin/bash -c "cd /opt/CosyVoice/CosyVoice/runtime/python/fastapi && python3 server.py --port 50000 --model_dir /opt/CosyVoice/assets/pretrained_models/Fun-CosyVoice3-0.5B-2512"
+    # Host IPC for better GPU memory sharing (prevents UVM issues)
+    ipc: host
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:50000/docs" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       - mcn_network
 
@@ -93,10 +112,100 @@ services:
       - "8081:80"
     volumes:
       - ./config/nginx_cors.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./assets:/usr/share/nginx/html/assets:ro
+      - ./assets:/opt/mcn/assets:ro # Unified Asset Path
+    networks:
+      - mcn_network
+
+  # --- Brain Layer (Phase 8.5) ---
+
+  # 👂 Whisper - Word-Level Audio Alignment (CPU for VRAM savings)
+  whisper:
+    image: fedirz/faster-whisper-server:latest-cpu
+    container_name: mcn_whisper
+    restart: always
+    ports:
+      - "8083:8000"
+    environment:
+      - WHISPER__MODEL=medium
+      - WHISPER__DEFAULT_LANGUAGE=zh
+    volumes:
+      - ./assets:/opt/mcn/assets # Unified Asset Path
+    networks:
+      - mcn_network
+
+  # --- Perception Layer (Phase 10) ---
+
+  # 📡 RSSHub - Universal Feed Converter (YouTube/Twitter → RSS)
+  rsshub:
+    image: diygod/rsshub:latest
+    container_name: mcn_rsshub
+    restart: always
+    ports:
+      - "1200:1200"
+    environment:
+      - CACHE_TYPE=redis
+      - REDIS_URL=redis://redis:6379/
+      # ⚠️ Required for Twitter/YouTube access in China
+      # - PROXY_URI=http://your_proxy_ip:port
+    depends_on:
+      - redis
+    networks:
+      - mcn_network
+
+  # 👂 ydl_api_ng - YouTube Info/Subtitle Extraction API
+  ytdlp:
+    image: totonyus/ydl_api_ng:latest
+    container_name: mcn_ytdlp
+    restart: always
+    ports:
+      - "8082:80"
+    volumes:
+      - ./assets/temp:/app/downloads
+    networks:
+      - mcn_network
+
+  # 🔥 Crawl4AI - Open Source Web Scraper (No Auth Required)
+  crawl4ai:
+    image: unclecode/crawl4ai:latest
+    container_name: mcn_crawl4ai
+    restart: always
+    ports:
+      - "3002:11235"
+    environment:
+      - CRAWL4AI_API_TOKEN=mcn_local_token
+      # Proxy for accessing blocked sites (Clash Verge on host)
+      - HTTP_PROXY=http://172.17.0.1:7897
+      - HTTPS_PROXY=http://172.17.0.1:7897
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - mcn_network
+
+  # --- LLM Layer (Local DeepSeek Fallback) ---
+  ollama:
+    image: ollama/ollama:latest
+    container_name: mcn_ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    volumes:
+      - /mnt/data_ssd/ollama:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
     networks:
       - mcn_network
 
 networks:
   mcn_network:
     driver: bridge
+
+volumes:
+  cosyvoice_cache:
+    driver: local

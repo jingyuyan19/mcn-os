@@ -1,7 +1,7 @@
 # MCN OS Current State
 
-**Last Updated:** 2026-01-04  
-**Version:** 1.0 (Phase 9 Complete)
+**Last Updated:** 2026-01-07  
+**Version:** 1.1 (Phase 10 In Progress)
 
 ---
 
@@ -21,31 +21,72 @@ n8n Trigger → Sanity → DeepSeek Brain → Middleware → Remotion → MP4
 | Middleware API | ✅ Live | localhost:8000 |
 | Redis Queue | ✅ Live | Docker container |
 | ComfyUI | ✅ Ready | Manual start required |
-| CosyVoice | ✅ Ready | Docker container |
+| **CosyVoice** | ✅ **Golden Env** | `cosyvoice:v3-vpn` - Trembling fixed! |
 | Remotion | ✅ Live | Renders via middleware |
 | Nginx Assets | ✅ Live | Docker, port 8081 |
+| **LTX-2 Agent** | ✅ **VERIFIED** | 20s HD Video on RTX 4090 |
+| Perception Layer | 🔄 Starting | yt-dlp, RSSHub, Crawl4AI |
+
+---
+
+## 🆕 Recent Updates (2026-01-07)
+
+### CosyVoice v3 Golden Environment ✅
+The trembling/shaky audio issue has been **resolved**:
+
+| Feature | Status |
+|---------|--------|
+| English TTS | ✅ 211KB, 2.8s |
+| Chinese TTS | ✅ 351KB, 2.85s |
+| Zero-shot cloning | ✅ Working |
+
+**Fixes Applied:**
+1. `n_timesteps=50` for audio stability
+2. `server.py` temp file handling for CosyVoice3 API
+3. `ruamel.yaml<0.18` + `x-transformers` dependencies
+4. Model config fix (cosyvoice3.yaml)
+
+**Docker Image:** `cosyvoice:v3-vpn`
+
+### CosyVoice API Endpoint
+```
+POST http://localhost:50000/inference_zero_shot
+Content-Type: multipart/form-data
+
+- tts_text: Text to synthesize (include <|endofprompt|> for CosyVoice3)
+- prompt_text: Reference prompt with <|endofprompt|>
+- prompt_wav: Reference audio file (binary)
+```
 
 ---
 
 ## 📋 Completed Phases
 
-### Phase 1-3: Sanity Setup ✅
-- 8 schemas created (artist, schedule, post, voice, wardrobe, studio, source, prompt_config)
-- Test data seeded
+### Phase 1-3: Infrastructure ✅
+- Docker, Redis, Postgres configured
+- Volume mounts on SSD (`/mnt/data_ssd`)
+- 8 Sanity schemas created
 
-### Phase 4: n8n Automation ✅
-- 4 workflows: Schedule Poller, Post Generator, Video Renderer, Orchestrator V8.8
-
-### Phase 5: DevOps ✅
+### Phase 4-5: n8n & DevOps ✅
+- 4 workflows deployed
 - Git LFS configured
 - Backup scripts created
 
-### Phase 6: GPU Integration ✅
+### Phase 6-7: GPU Integration ✅
 - Async middleware with Redis queue
 - ComfyUI + CosyVoice drivers
+- Async middleware with Redis queue
+- ComfyUI + CosyVoice drivers
+- End-to-end test passed
 
-### Phase 7: End-to-End Test ✅
-- n8n → Middleware → ComfyUI verified
+### Phase 7: LTX-2 Video Generation ✅
+- **Verified**: 20s HD (1280x720) Video + Audio on RTX 4090
+- **Configuration**: `--cache-none --reserve-vram 8 --fp8`
+- **Result**: Native HD generation without OOM
+
+### Phase 10: Perception Layer (In Progress) 🔄
+- Services deploying: `rsshub`, `ytdlp`, `crawl4ai`
+- Goal: Automated source tracking & asset collection
 
 ### Phase 8: Remotion Engine ✅
 - Video composition from JSON timeline
@@ -55,34 +96,36 @@ n8n Trigger → Sanity → DeepSeek Brain → Middleware → Remotion → MP4
 - Chain-of-thought: Analyst → Writer → Director → Editor
 - Full pipeline generates 60-second MP4
 
+### Phase 10: CosyVoice Golden Environment ✅ (Partial)
+- Trembling audio fixed
+- Docker image built and running
+
 ---
 
 ## 🚧 Not Yet Implemented
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
-| Real avatar video | High | Currently using placeholder |
-| CosyVoice in pipeline | High | Driver ready, not wired |
+| Real avatar in pipeline | High | LongCat ready, needs wiring |
+| CosyVoice in n8n workflow | High | API working, needs integration |
 | Subtitle sync | Medium | Need word timestamps |
-| B-roll generation | Medium | WanVideo integrated |
 | Auto-publish | Low | Social media APIs |
 
 ---
 
 ## 🎯 Recommended Next Steps
 
-1. **Replace placeholder videos**
-   - Generate real avatar with LongCat LoRA
-   - Create B-roll with WanVideo
-
-2. **Wire CosyVoice**
-   - Call TTS from n8n after Writer stage
+1. **Wire CosyVoice to n8n workflow**
+   - Call `inference_zero_shot` after Writer stage
    - Use audio duration for timeline
+
+2. **Generate real avatar video**
+   - Use LongCat LoRA with CosyVoice audio
+   - Replace placeholder videos
 
 3. **Production cleanup**
    - Rotate API keys
    - Set up proper secrets management
-   - Configure production n8n URL
 
 ---
 
@@ -90,28 +133,31 @@ n8n Trigger → Sanity → DeepSeek Brain → Middleware → Remotion → MP4
 
 | File | Purpose |
 |------|---------|
+| `docker/cosyvoice/Dockerfile` | CosyVoice Golden Environment |
 | `n8n/workflows/3_Orchestrator_V8_8.json` | Main brain workflow |
 | `middleware/worker.py` | GPU task processor |
 | `rendering/src/Composition.tsx` | Video composition |
-| `sanity-studio/schemaTypes/` | CMS schemas |
 | `docker-compose.yml` | Service definitions |
 
 ---
 
-## 🔑 Current Credentials
+## 🔑 Access Points
 
-> **For development only. Rotate in production.**
-
-| Service | Key |
+| Service | URL |
 |---------|-----|
-| Sanity Project | 4t6f8tmh |
-| DeepSeek API | sk-4756665d490f43d59223ab9567be34c8 |
+| n8n | http://localhost:5678 |
+| Sanity Studio | http://localhost:3333 |
+| Middleware API | http://localhost:8000 |
+| CosyVoice | http://localhost:50000 |
+| Asset Server | http://localhost:8081 |
+| ComfyUI | http://localhost:8188 |
 
 ---
 
-## 📊 Last Successful Run
+## 📊 Last Successful Runs
 
-- **Date:** 2026-01-04 09:34
-- **Task ID:** 81bc86db-3837-489c-92e6-335bf8d1bea6
-- **Output:** `assets/output/render_81bc86db....mp4` (2.5MB)
-- **Duration:** 60 seconds video
+| Date | Task | Result |
+|------|------|--------|
+| 2026-01-07 16:23 | CosyVoice English TTS | ✅ 211KB in 2.80s |
+| 2026-01-07 16:28 | CosyVoice Chinese TTS | ✅ 351KB in 2.85s |
+| 2026-01-04 09:34 | Full Remotion Render | ✅ 2.5MB MP4 (60s) |

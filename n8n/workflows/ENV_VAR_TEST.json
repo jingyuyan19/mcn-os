@@ -1,0 +1,45 @@
+{
+    "name": "ENV_VAR_TEST",
+    "nodes": [
+        {
+            "parameters": {},
+            "id": "1",
+            "name": "Manual Trigger",
+            "type": "n8n-nodes-base.manualTrigger",
+            "position": [
+                250,
+                300
+            ],
+            "typeVersion": 1
+        },
+        {
+            "parameters": {
+                "jsCode": "// Test reading environment variables\nconst projectId = $env.SANITY_PROJECT_ID || 'NOT_SET';\nconst apiToken = $env.SANITY_API_TOKEN ? 'SET (hidden)' : 'NOT_SET';\nconst deepseek = $env.DEEPSEEK_API_KEY ? 'SET (hidden)' : 'NOT_SET';\n\nreturn [{ \n  json: { \n    SANITY_PROJECT_ID: projectId,\n    SANITY_API_TOKEN: apiToken,\n    DEEPSEEK_API_KEY: deepseek,\n    test_url: 'https://' + projectId + '.api.sanity.io/v2024-01-01/data/query/production'\n  } \n}];"
+            },
+            "id": "2",
+            "name": "Check Env Vars",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                470,
+                300
+            ],
+            "typeVersion": 2
+        }
+    ],
+    "connections": {
+        "Manual Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Check Env Vars",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

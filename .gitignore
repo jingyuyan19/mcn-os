@@ -49,3 +49,5 @@ outputs/
 !assets/.gitkeep
 !n8n/workflows/*.json
 models/
+*.whl
+docker/cosyvoice/packages/

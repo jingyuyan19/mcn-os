@@ -1,0 +1,155 @@
+{
+    "name": "5_Simple_Spider_Test",
+    "nodes": [
+        {
+            "parameters": {},
+            "id": "1",
+            "name": "Manual Trigger",
+            "type": "n8n-nodes-base.manualTrigger",
+            "position": [
+                260,
+                300
+            ],
+            "typeVersion": 1
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://crawl4ai:11235/crawl",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "{\n  \"urls\": [\"https://techcrunch.com/category/artificial-intelligence/\"],\n  \"word_count_threshold\": 50\n}"
+            },
+            "id": "2",
+            "name": "Crawl TechCrunch",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                480,
+                300
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "jsCode": "const result = items[0].json;\nconst markdown = result.results?.[0]?.markdown || 'No content';\nreturn [{ json: { content: markdown.substring(0, 2000), success: result.success } }];"
+            },
+            "id": "3",
+            "name": "Extract Content",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                700,
+                300
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.deepseek.com/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer sk-4756665d490f43d59223ab9567be34c8"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"model\": \"deepseek-chat\",\n  \"messages\": [\n    {\"role\": \"system\", \"content\": \"Summarize this AI news in 50 words. Output JSON: {\\\"summary\\\": \\\"...\\\"}\"},\n    {\"role\": \"user\", \"content\": \"{{ $json.content }}\"}\n  ]\n}"
+            },
+            "id": "4",
+            "name": "DeepSeek Summarize",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                920,
+                300
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://4t6f8tmh.api.sanity.io/v2024-01-01/data/mutate/production",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer skNfoTE6nT4cO7t9jj1fRtqL86MJyXKCvLpUWut3q0y1oZQwnQEHz5og38NrYtw7qj5VAeUgSGvDxQmVcgqJzzXrtdwfUrDLtF8GSr4MQ00DJLsTdNmfgkHjmynoiPqrUPEAWeBbIf2bsHS5fezjBqUnnwjMtzQmCcxmCOsVsNFTAE5kBvXP"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"mutations\": [{\n    \"create\": {\n      \"_type\": \"post\",\n      \"title\": \"Spider Test: AI News Summary\",\n      \"status\": \"draft\",\n      \"artist\": { \"_type\": \"reference\", \"_ref\": \"4578bd80-0dc5-4217-beeb-09eac88b81e9\" },\n      \"source_content\": \"{{ $json.choices[0].message.content }}\"\n    }\n  }]\n}"
+            },
+            "id": "5",
+            "name": "Create Draft Post",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                1140,
+                300
+            ],
+            "typeVersion": 4.2
+        }
+    ],
+    "connections": {
+        "Manual Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Crawl TechCrunch",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Crawl TechCrunch": {
+            "main": [
+                [
+                    {
+                        "node": "Extract Content",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extract Content": {
+            "main": [
+                [
+                    {
+                        "node": "DeepSeek Summarize",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "DeepSeek Summarize": {
+            "main": [
+                [
+                    {
+                        "node": "Create Draft Post",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

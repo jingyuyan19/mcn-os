@@ -98,12 +98,12 @@ export default {
             description: '此艺人可使用的服装列表'
         },
         {
-            name: 'available_studios',
-            group: 'config',
-            title: '常驻影棚',
+            name: 'studio_images',
+            group: 'visuals',
+            title: '影棚背景图',
             type: 'array',
-            of: [{ type: 'reference', to: [{ type: 'studio' }] }],
-            description: '此艺人可使用的摄影棚列表'
+            of: [{ type: 'image', options: { hotspot: true } }],
+            description: '此艺人专属影棚的背景图（可多张）'
         },
         {
             name: 'default_sources',

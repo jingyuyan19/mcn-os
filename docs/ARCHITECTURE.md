@@ -1,46 +1,49 @@
-# MCN OS Architecture v1.0
+# MCN OS Architecture v2.0
 
 **AI-Driven Video Production Pipeline**
 
-> *"From Idea to Published Video, Fully Automated"*
+> *"From Idea to Published Video, Human-in-the-Loop Automated"*
 
 ---
 
-## System Overview
+## System Overview (2-Flow Design)
+
+The system uses **two decoupled workflows** connected via **Sanity CMS** as a state machine:
+
+| Flow | Purpose | Trigger |
+|------|---------|---------|
+| **🎨 创作流 (Creative)** | Content planning & approval | Schedule / Manual |
+| **🎬 生产流 (Production)** | Media generation & publishing | Sanity Webhook |
 
 ```mermaid
-graph LR
-    subgraph Control["🎛️ Control Plane"]
-        Sanity[Sanity CMS]
+flowchart LR
+    subgraph Creative["🎨 创作流"]
+        C1[Schedule] --> C2[Spider]
+        C2 --> C3[Analyst]
+        C3 --> C4[Screenwriter]
+        C4 --> C5[Create Post]
     end
     
-    subgraph Brain["🧠 The Brain (n8n)"]
-        Trigger[Schedule/Webhook]
-        Analyst[Analyst]
-        Writer[Writer]
-        Director[Director]
-        Editor[Editor JS]
+    subgraph Sanity["📦 Sanity"]
+        S1[(Post<br/>pending_approval)]
+        S2{Manager}
+        S3[(Post<br/>approved)]
     end
     
-    subgraph Muscle["💪 GPU Middleware"]
-        API[FastAPI :8000]
-        Worker[GPU Worker]
-        ComfyUI[ComfyUI]
-        CosyVoice[CosyVoice TTS]
-        Remotion[Remotion Renderer]
+    subgraph Production["🎬 生产流"]
+        P1[Webhook] --> P2[Voice TTS]
+        P2 --> P3[Avatar Video]
+        P3 --> P4[B-Roll Gen]
+        P4 --> P5[Remotion]
+        P5 --> P6[Final Video]
     end
     
-    subgraph Output["📤 Output"]
-        Assets[Asset Server :8081]
-        MP4[Final MP4]
-    end
-    
-    Sanity --> Trigger
-    Trigger --> Analyst --> Writer --> Director --> Editor
-    Editor --> API --> Worker
-    Worker --> ComfyUI & CosyVoice & Remotion
-    Remotion --> Assets --> MP4
+    C5 --> S1
+    S1 --> S2
+    S2 -->|Approve| S3
+    S3 --> P1
 ```
+
 
 ---
 
@@ -170,8 +173,9 @@ open http://localhost:5678
 
 ---
 
-## Verified: 2026-01-04
+## Verified: 2026-01-07
 
 - ✅ Full pipeline tested: Brain → Middleware → Remotion → MP4
+- ✅ CosyVoice v3 Golden Environment working (English + Chinese)
 - ✅ Output: 2.5MB video (60 seconds)
 - ✅ All 10 n8n nodes executing successfully

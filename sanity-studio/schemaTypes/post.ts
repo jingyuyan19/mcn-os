@@ -53,25 +53,34 @@ export default {
                         }
                     }
                 },
-                {
-                    name: 'selected_studio',
-                    title: '指定影棚',
-                    type: 'reference',
-                    to: [{ type: 'studio' }],
-                    // 🛡️ Critical Fix: GROQ Filter - Only show artist's available studios
-                    options: {
-                        filter: ({ document }: { document: any }) => {
-                            if (!document?.artist?._ref) {
-                                return { filter: 'true' }
-                            }
-                            return {
-                                filter: '_id in *[_type == "artist" && _id == $artistId].available_studios[]._ref',
-                                params: { artistId: document.artist._ref }
-                            }
-                        }
-                    }
-                }
+                // Studio selection removed (inferred from Artist)
             ]
+        },
+
+        // === Phase 10: Perception Layer (情报源数据) ===
+        {
+            name: 'created_from_source',
+            group: 'config',
+            title: '来源情报',
+            type: 'reference',
+            to: [{ type: 'source' }],
+            description: '此工单由哪个情报源触发创建'
+        },
+        {
+            name: 'source_content',
+            group: 'config',
+            title: '原始内容',
+            type: 'text',
+            rows: 5,
+            description: '抓取的 Markdown/Transcript 原文'
+        },
+        {
+            name: 'source_evidence',
+            group: 'config',
+            title: '视觉证据',
+            type: 'image',
+            options: { hotspot: true },
+            description: '网页截图或视频缩略图 (用于 B-Roll)'
         },
 
         // === Group 2: Storyboard (核心分镜) ===

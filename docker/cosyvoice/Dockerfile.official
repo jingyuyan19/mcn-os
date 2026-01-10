@@ -1,0 +1,59 @@
+# CosyVoice Official Dockerfile (Modified for VPN + CosyVoice3)
+# Based on: https://github.com/FunAudioLLM/CosyVoice/blob/main/docker/Dockerfile
+
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+
+ARG VENV_NAME="cosyvoice"
+ENV VENV=$VENV_NAME
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+SHELL ["/bin/bash", "--login", "-c"]
+
+# System dependencies
+RUN apt-get update -y --fix-missing && \
+    apt-get install -y git build-essential curl wget ffmpeg unzip git git-lfs sox libsox-dev && \
+    apt-get clean && \
+    git lfs install
+
+# Install Miniforge (Conda)
+RUN wget --quiet https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O ~/miniforge.sh && \
+    /bin/bash ~/miniforge.sh -b -p /opt/conda && \
+    rm ~/miniforge.sh && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo "source /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    echo "conda activate ${VENV}" >> ~/.bashrc
+
+ENV PATH /opt/conda/bin:$PATH
+
+RUN conda config --add channels conda-forge && \
+    conda config --set channel_priority strict
+
+# Create conda environment
+RUN conda create -y -n ${VENV} python=3.10
+ENV CONDA_DEFAULT_ENV=${VENV}
+ENV PATH /opt/conda/bin:/opt/conda/envs/${VENV}/bin:$PATH
+
+WORKDIR /workspace
+
+ENV PYTHONPATH="${PYTHONPATH}:/workspace/CosyVoice:/workspace/CosyVoice/third_party/Matcha-TTS"
+
+# Copy local CosyVoice repo (instead of git clone to avoid network issues)
+COPY CosyVoice /workspace/CosyVoice
+
+# Install pynini (required for text normalization)
+RUN conda activate ${VENV} && conda install -y -c conda-forge pynini==2.1.5
+
+# Install Python dependencies
+RUN conda activate ${VENV} && cd /workspace/CosyVoice && \
+    pip install -r requirements.txt --no-cache-dir
+
+# Apply patches for CosyVoice3
+# Fix 1: n_timesteps=50 for audio stability
+RUN cd /workspace/CosyVoice && \
+    grep -rl "n_timesteps" . | xargs -r sed -i 's/n_timesteps=[0-9]*/n_timesteps=50/g'
+
+WORKDIR /workspace/CosyVoice
+
+# Default command
+CMD ["python3", "runtime/python/fastapi/server.py", "--port", "50000", "--model_dir", "/models/Fun-CosyVoice3-0.5B-2512"]

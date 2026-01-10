@@ -1,0 +1,824 @@
+{
+    "name": "4_Intelligence_Spider_V2",
+    "nodes": [
+        {
+            "parameters": {},
+            "id": "1",
+            "name": "Schedule Trigger",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "position": [
+                260,
+                300
+            ],
+            "typeVersion": 1.2
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "={{ 'https://' + $env.SANITY_PROJECT_ID + '.api.sanity.io/v2024-01-01/data/query/production' }}",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "={{ 'Bearer ' + $env.SANITY_API_TOKEN }}"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": {
+                    "query": "*[_type == \"source\" && platform != null] { _id, name, url, platform, rsshub_route, extraction_config }"
+                }
+            },
+            "id": "2",
+            "name": "Fetch Sources",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                480,
+                300
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "jsCode": "const sources = items[0].json.result || [];\nreturn sources.map(s => ({ json: s }));"
+            },
+            "id": "3",
+            "name": "Split Sources",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                700,
+                300
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "batchSize": 1
+            },
+            "id": "4",
+            "name": "Loop Sources",
+            "type": "n8n-nodes-base.splitInBatches",
+            "position": [
+                920,
+                300
+            ],
+            "typeVersion": 3
+        },
+        {
+            "parameters": {
+                "jsCode": "const source = items[0].json;\nlet scrapeUrl = source.url;\nlet pipeline = source.platform || 'web';\n\nif (source.rsshub_route) {\n  let route = source.rsshub_route;\n  if (route.startsWith('/')) route = route.substring(1);\n  \n  if (pipeline === 'youtube') {\n    if (route.startsWith('UC')) {\n      scrapeUrl = 'http://rsshub:1200/youtube/channel/' + route;\n    } else {\n      scrapeUrl = 'http://rsshub:1200/youtube/user/' + route;\n    }\n  } else if (pipeline === 'twitter') {\n    scrapeUrl = 'http://rsshub:1200/twitter/user/' + route;\n  }\n}\n\nreturn [{ json: { ...source, scrapeUrl, pipeline } }];"
+            },
+            "id": "5",
+            "name": "Route Platform",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                1140,
+                300
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "rules": {
+                    "values": [
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict"
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "youtube_cond",
+                                        "leftValue": "={{ $json.pipeline }}",
+                                        "rightValue": "youtube",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputLabel": "YouTube"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict"
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "twitter_cond",
+                                        "leftValue": "={{ $json.pipeline }}",
+                                        "rightValue": "twitter",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputLabel": "Twitter"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict"
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "web_cond",
+                                        "leftValue": "={{ $json.pipeline }}",
+                                        "rightValue": "web",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputLabel": "Web"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "20",
+            "name": "Pipeline Switch",
+            "type": "n8n-nodes-base.switch",
+            "position": [
+                1360,
+                300
+            ],
+            "typeVersion": 3
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "={{ $json.scrapeUrl }}",
+                "options": {
+                    "response": {
+                        "responseFormat": "text"
+                    }
+                }
+            },
+            "id": "21",
+            "name": "YouTube RSS",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                1580,
+                100
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "jsCode": "const xml = items[0].json.data || items[0].json.body || '';\nconst prevData = $('Route Platform').item.json;\n\nlet videoUrl = '';\n\n// Strategy 1: Atom format (<entry>...<link href=\"...\"/>)\nconst atomMatch = xml.match(/<entry>[\\s\\S]*?<link[^>]+href=[\"']([^\"']+)[\"']/);\nif (atomMatch) videoUrl = atomMatch[1];\n\n// Strategy 2: RSS 2.0 format (<item>...<link>...</link>)\nif (!videoUrl) {\n  const rssMatch = xml.match(/<item>[\\s\\S]*?<link>([^<]+)<\\/link>/);\n  if (rssMatch) videoUrl = rssMatch[1];\n}\n\n// Strategy 3: Loose regex for YouTube URLs\nif (!videoUrl) {\n  const looseMatch = xml.match(/href=[\"'](https?:\\/\\/(?:www\\.)?youtube\\.com\\/watch\\?v=[^\"']+|https?:\\/\\/youtu\\.be\\/[^\"']+)[\"']/);\n  if (looseMatch) videoUrl = looseMatch[1];\n}\n\n// Extract titles for context\nconst titleMatches = xml.match(/<title>([^<]+)<\\/title>/g) || [];\nlet titles = '';\nfor (let i = 1; i < Math.min(titleMatches.length, 5); i++) {\n  titles += titleMatches[i].replace(/<\\/?title>/g, '') + ' | ';\n}\n\nif (videoUrl) {\n  return [{ json: { videoUrl, titles, ...prevData } }];\n}\n\n// Debug output if failed\nconst debugXml = xml.substring(0, 500).replace(/\\n/g, ' ');\nreturn [{ json: { results: [{ markdown: 'YouTube Feed (No Video Found): ' + titles + ' | DEBUG XML: ' + debugXml }], ...prevData } }];"
+            },
+            "id": "22",
+            "name": "Parse YouTube RSS",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                1800,
+                100
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "={{ 'http://ytdlp:80/extract_info?url=' + $json.videoUrl }}",
+                "options": {}
+            },
+            "id": "25",
+            "name": "YouTube Info",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                2020,
+                100
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "jsCode": "const source = items[0].json;\nconst prevData = $('Parse YouTube RSS').item.json;\n\nlet content = prevData.titles || '';\n\nif (source.description) {\n  content += '\\n\\nDescription:\\n' + source.description;\n}\n\nif (source.automatic_captions) {\n  const captionKeys = Object.keys(source.automatic_captions);\n  if (captionKeys.includes('en')) {\n    content += '\\n\\n[Transcript available (en)]';\n  }\n}\n\nreturn [{ json: { results: [{ markdown: content.substring(0, 10000) }], ...prevData } }];"
+            },
+            "id": "26",
+            "name": "Parse YouTube",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                2240,
+                100
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://crawl4ai:11235/crawl",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"urls\": [\"{{ $json.scrapeUrl }}\"],\n  \"word_count_threshold\": 50,\n  \"screenshot\": true,\n  \"magic\": true,\n  \"page_timeout\": 60000,\n  \"browser_config\": {\n    \"proxy\": \"http://172.17.0.1:7897\"\n  }\n}"
+            },
+            "id": "23",
+            "name": "Twitter Scrape",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                1580,
+                300
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "jsCode": "const source = items[0].json;\nconst prevData = $('Route Platform').item.json;\n\nlet content = '';\nif (source.results && source.results[0]) {\n  const r = source.results[0];\n  content = r.markdown || r.cleaned_html || r.html || JSON.stringify(r);\n}\nconst screenshot = source.results?.[0]?.screenshot || '';\n\nreturn [{ json: { results: [{ markdown: content, screenshot }], ...prevData } }];"
+            },
+            "id": "24",
+            "name": "Parse Twitter",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                1800,
+                300
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "=http://crawl4ai:11235/crawl?t={{ Date.now() }}",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"urls\": [\"{{ $json.scrapeUrl }}\"],\n  \"browser_config\": {\n    \"type\": \"BrowserConfig\",\n    \"params\": {\n      \"headless\": true\n    }\n  },\n  \"crawler_config\": {\n    \"type\": \"CrawlerRunConfig\",\n    \"params\": {\n      \"stream\": false,\n      \"word_count_threshold\": 50,\n      \"magic\": true,\n      \"page_timeout\": 120000,\n      \"cache_mode\": \"BYPASS\",\n      \"deep_crawl_strategy\": {\n        \"type\": \"BestFirstCrawlingStrategy\",\n        \"params\": {\n          \"max_depth\": 1,\n          \"max_pages\": 10,\n          \"include_external\": false,\n          \"url_scorer\": {\n            \"type\": \"KeywordRelevanceScorer\",\n            \"params\": {\n              \"keywords\": [\"news\", \"article\", \"blog\", \"index\", \"announcement\", \"post\"],\n              \"weight\": 0.7\n            }\n          }\n        }\n      }\n    }\n  }\n}",
+                "options": {
+                    "timeout": 300000
+                }
+            },
+            "id": "6",
+            "name": "Web Scrape (Deep Crawl)",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                1580,
+                500
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "jsCode": "// Handle Deep Crawl results - multiple pages returned\nconst source = items[0].json;\nconst prevData = $('Route Platform').item.json;\nconst results = source.results || [];\n\n// Process each crawled page\nconst output = results.map((r, idx) => {\n  // Extract markdown (prefer raw_markdown from nested structure)\n  let content = '';\n  if (r.markdown) {\n    if (typeof r.markdown === 'object' && r.markdown.raw_markdown) {\n      content = r.markdown.raw_markdown;\n    } else if (typeof r.markdown === 'string') {\n      content = r.markdown;\n    }\n  }\n  if (!content && r.cleaned_html) content = r.cleaned_html;\n  if (!content && r.fit_html) content = r.fit_html;\n  // Skip full HTML intentionally - too large\n  \n  // Generate stable hash from URL\n  const pageUrl = r.url || `${prevData.url}_${idx}`;\n  const hash = Buffer.from(pageUrl).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);\n  \n  return {\n    json: {\n      hash,\n      pageUrl,\n      content: content.substring(0, 10000),\n      source_id: prevData._id,\n      source_name: prevData.name,\n      ai_instruction: prevData.extraction_config?.ai_instruction || ''\n    }\n  };\n}).filter(item => item.json.content.length > 100);\n\nreturn output.length > 0 ? output : [{ json: { error: 'No content extracted', source: prevData.name } }];"
+            },
+            "id": "7",
+            "name": "Process Content",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                2460,
+                300
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "operation": "get",
+                "key": "={{ $json.hash }}",
+                "propertyName": "cached_value"
+            },
+            "id": "8",
+            "name": "Redis Check",
+            "type": "n8n-nodes-base.redis",
+            "position": [
+                2680,
+                300
+            ],
+            "typeVersion": 1
+        },
+        {
+            "parameters": {
+                "jsCode": "const cached = items[0].json.cached_value;\nconst prevData = $('Process Content').item.json;\n\nconst isDuplicate = (cached !== undefined && cached !== null && cached.toString() === '1');\n\nreturn [{ json: { ...prevData, isDuplicate } }];"
+            },
+            "id": "9",
+            "name": "Check Duplicate",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                2900,
+                300
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": ""
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ $json.isDuplicate }}",
+                            "rightValue": false,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            },
+            "id": "10",
+            "name": "Skip Duplicates",
+            "type": "n8n-nodes-base.if",
+            "position": [
+                3120,
+                300
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "operation": "set",
+                "key": "={{ $json.hash }}",
+                "value": "1",
+                "expire": true,
+                "ttl": 604800
+            },
+            "id": "11",
+            "name": "Mark Seen",
+            "type": "n8n-nodes-base.redis",
+            "position": [
+                3340,
+                200
+            ],
+            "typeVersion": 1
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.deepseek.com/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "={{ 'Bearer ' + $env.DEEPSEEK_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"model\": \"deepseek-chat\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a news filter. Decide if the following content is relevant news for AI artists. Respond with ONLY a JSON object: {\\\"relevant\\\": true/false, \\\"reason\\\": \\\"brief reason\\\"}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify($json.content.substring(0, 3000)) }}\n    }\n  ]\n}"
+            },
+            "id": "12",
+            "name": "DeepSeek Filter",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                3560,
+                200
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "jsCode": "const response = items[0].json;\nconst prevData = $('Mark Seen').item.json;\n\nlet relevant = false;\ntry {\n  const content = response.choices?.[0]?.message?.content || '';\n  const parsed = JSON.parse(content);\n  relevant = parsed.relevant === true;\n} catch (e) {\n  relevant = false;\n}\n\nreturn [{ json: { ...prevData, relevant } }];"
+            },
+            "id": "13",
+            "name": "Parse Filter",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                3780,
+                200
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": ""
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ $json.relevant }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            },
+            "id": "14",
+            "name": "If Relevant",
+            "type": "n8n-nodes-base.if",
+            "position": [
+                4000,
+                200
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "={{ 'https://' + $env.SANITY_PROJECT_ID + '.api.sanity.io/v2024-01-01/data/query/production' }}",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "={{ 'Bearer ' + $env.SANITY_API_TOKEN }}"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": {
+                    "query": "*[_type == \"artist\"] { _id, name, style, expertise }"
+                }
+            },
+            "id": "15",
+            "name": "Find Artists",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                4220,
+                100
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "jsCode": "const artists = items[0].json.result || [];\nconst prevData = $('If Relevant').item.json;\n\nif (artists.length === 0) {\n  return [{ json: { ...prevData, artist_id: null } }];\n}\n\nconst randomArtist = artists[Math.floor(Math.random() * artists.length)];\nreturn [{ json: { ...prevData, artist_id: randomArtist._id, artist_name: randomArtist.name } }];"
+            },
+            "id": "16",
+            "name": "Select Artist",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                4440,
+                100
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "={{ 'https://' + $env.SANITY_PROJECT_ID + '.api.sanity.io/v2024-01-01/data/mutate/production' }}",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "={{ 'Bearer ' + $env.SANITY_API_TOKEN }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"mutations\": [\n    {\n      \"create\": {\n        \"_type\": \"draft_post\",\n        \"status\": \"pending\",\n        \"source\": { \"_type\": \"reference\", \"_ref\": \"{{ $json.source_id }}\" },\n        \"assigned_artist\": {{ $json.artist_id ? '{\"_type\": \"reference\", \"_ref\": \"' + $json.artist_id + '\"}' : 'null' }},\n        \"raw_content\": {{ JSON.stringify($json.content.substring(0, 5000).replace(/\\\"/g, '\\\\\"')) }},\n        \"created_at\": \"{{ new Date().toISOString() }}\"\n      }\n    }\n  ]\n}"
+            },
+            "id": "17",
+            "name": "Create Draft",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                4660,
+                100
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {},
+            "id": "18",
+            "name": "End Loop",
+            "type": "n8n-nodes-base.noOp",
+            "position": [
+                4880,
+                300
+            ],
+            "typeVersion": 1
+        }
+    ],
+    "connections": {
+        "Schedule Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Sources",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Sources": {
+            "main": [
+                [
+                    {
+                        "node": "Split Sources",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Split Sources": {
+            "main": [
+                [
+                    {
+                        "node": "Loop Sources",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Loop Sources": {
+            "main": [
+                [
+                    {
+                        "node": "End Loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Route Platform",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Route Platform": {
+            "main": [
+                [
+                    {
+                        "node": "Pipeline Switch",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Pipeline Switch": {
+            "main": [
+                [
+                    {
+                        "node": "YouTube RSS",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Twitter Scrape",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Web Scrape",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "YouTube RSS": {
+            "main": [
+                [
+                    {
+                        "node": "Parse YouTube RSS",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse YouTube RSS": {
+            "main": [
+                [
+                    {
+                        "node": "YouTube Info",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "YouTube Info": {
+            "main": [
+                [
+                    {
+                        "node": "Parse YouTube",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse YouTube": {
+            "main": [
+                [
+                    {
+                        "node": "Process Content",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Twitter Scrape": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Twitter",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Twitter": {
+            "main": [
+                [
+                    {
+                        "node": "Process Content",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Web Scrape": {
+            "main": [
+                [
+                    {
+                        "node": "Process Content",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Process Content": {
+            "main": [
+                [
+                    {
+                        "node": "Redis Check",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Redis Check": {
+            "main": [
+                [
+                    {
+                        "node": "Check Duplicate",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check Duplicate": {
+            "main": [
+                [
+                    {
+                        "node": "Skip Duplicates",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Skip Duplicates": {
+            "main": [
+                [
+                    {
+                        "node": "Mark Seen",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Loop Sources",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Mark Seen": {
+            "main": [
+                [
+                    {
+                        "node": "DeepSeek Filter",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "DeepSeek Filter": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Filter",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Filter": {
+            "main": [
+                [
+                    {
+                        "node": "If Relevant",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "If Relevant": {
+            "main": [
+                [
+                    {
+                        "node": "Find Artists",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Loop Sources",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Find Artists": {
+            "main": [
+                [
+                    {
+                        "node": "Select Artist",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Select Artist": {
+            "main": [
+                [
+                    {
+                        "node": "Create Draft",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Create Draft": {
+            "main": [
+                [
+                    {
+                        "node": "Loop Sources",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

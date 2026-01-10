@@ -16,47 +16,31 @@ export default {
             name: 'cosyvoice_id',
             title: 'CosyVoice 音色 ID',
             type: 'string',
-            description: '用于 API 调用的标识符',
-            validation: (Rule: any) => Rule.required()
+            description: '用于 API 调用的标识符 (Zero-Shot模式可留空)'
         },
         {
             name: 'sample_audio',
-            title: '试听样本',
+            title: '参考音频',
             type: 'file',
             options: {
                 accept: 'audio/*'
-            }
+            },
+            description: '⚠️ 必须是清晰的单人语音，3-10秒为佳',
+            validation: (Rule: any) => Rule.required()
         },
         {
-            name: 'gender',
-            title: '性别',
-            type: 'string',
-            options: {
-                list: [
-                    { title: '男', value: 'male' },
-                    { title: '女', value: 'female' },
-                    { title: '中性', value: 'neutral' }
-                ]
-            }
-        },
-        {
-            name: 'style',
-            title: '风格',
-            type: 'string',
-            options: {
-                list: [
-                    { title: '专业', value: 'professional' },
-                    { title: '亲切', value: 'friendly' },
-                    { title: '激情', value: 'passionate' },
-                    { title: '沉稳', value: 'calm' }
-                ]
-            }
+            name: 'sample_transcription',
+            title: '参考音频文字',
+            type: 'text',
+            rows: 3,
+            description: '⚠️ 必填！音频中说的原文内容（用于Zero-Shot克隆）',
+            validation: (Rule: any) => Rule.required()
         }
     ],
     preview: {
         select: {
             title: 'name',
-            subtitle: 'style'
+            subtitle: 'cosyvoice_id'
         }
     }
 }

@@ -1,0 +1,405 @@
+{
+    "name": "5_Content_Director",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "generate-video",
+                "options": {}
+            },
+            "id": "1",
+            "name": "Webhook Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                260,
+                300
+            ],
+            "webhookId": "content-director"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "={{ 'https://' + $env.SANITY_PROJECT_ID + '.api.sanity.io/v2024-01-01/data/query/production' }}",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "={{ 'Bearer ' + $env.SANITY_API_TOKEN }}"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={ \"query\": \"*[_id == '\" + $json.body.artist_id + \"'][0] { name, niche, backstory }\" }"
+            },
+            "id": "2",
+            "name": "Fetch Artist DNA",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                480,
+                300
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://mcn_ollama:11434/v1/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"model\": \"deepseek-r1:7b\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"你是虚拟艺人。任务：将新闻素材改写成45-60秒短视频口播文案。要求：1.Hook开场 2.口语化 3.控制200-250字\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.body.source_content }}\"\n    }\n  ],\n  \"temperature\": 0.7\n}"
+            },
+            "id": "3",
+            "name": "DeepSeek Writer",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                700,
+                300
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "jsCode": "const response = items[0].json;\nlet content = response.choices?.[0]?.message?.content || '';\ncontent = content.replace(/<think>[\\s\\S]*?<\\/think>/i, '').trim();\nreturn [{ json: { script: content } }];"
+            },
+            "id": "4",
+            "name": "Extract Script",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                920,
+                300
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://mcn_ollama:11434/v1/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"model\": \"deepseek-r1:7b\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"你是视觉导演。将口播稿拆解为4-6个分镜。输出JSON: {shots: [{id, text, visual_type, image_prompt?, motion_prompt?}]}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.script }}\"\n    }\n  ],\n  \"temperature\": 0.3\n}"
+            },
+            "id": "5",
+            "name": "DeepSeek Director",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                1140,
+                300
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "jsCode": "const response = items[0].json;\nlet content = response.choices?.[0]?.message?.content || '{}';\ncontent = content.replace(/<think>[\\s\\S]*?<\\/think>/i, '').trim();\ncontent = content.replace(/```json\\n|\\n```|```/g, '');\ntry {\n  const plan = JSON.parse(content);\n  return [{ json: { script: $node['Extract Script'].json.script, shots: plan.shots || [] } }];\n} catch (e) {\n  return [{ json: { error: 'Parse failed', raw: content } }];\n}"
+            },
+            "id": "6",
+            "name": "Parse Director Plan",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                1360,
+                300
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://cosyvoice:50000/inference_instruct2",
+                "sendBody": true,
+                "contentType": "multipart-form-data",
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "tts_text",
+                            "value": "={{ $json.script }}"
+                        },
+                        {
+                            "name": "instruct_text",
+                            "value": "用自然热情的语气朗读"
+                        }
+                    ]
+                },
+                "options": {
+                    "response": {
+                        "response": {
+                            "fullResponse": true,
+                            "responseFormat": "file"
+                        }
+                    }
+                }
+            },
+            "id": "7",
+            "name": "CosyVoice TTS",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                1580,
+                200
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "operation": "write",
+                "fileName": "=/opt/mcn/assets/temp/audio_{{ $now.toMillis() }}.wav",
+                "dataPropertyName": "data"
+            },
+            "id": "8",
+            "name": "Save Audio",
+            "type": "n8n-nodes-base.writeBinaryFile",
+            "position": [
+                1800,
+                200
+            ],
+            "typeVersion": 1
+        },
+        {
+            "parameters": {
+                "jsCode": "// Get audio duration using a default value since we cannot run ffprobe in n8n\n// The actual duration will be calculated from the audio file length\nconst fileName = $node['Save Audio'].json.fileName;\n// Default to 60 seconds, Whisper will provide actual word timings\nreturn [{ json: { stdout: '60', fileName } }];"
+            },
+            "id": "9",
+            "name": "FFprobe Duration",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                2020,
+                200
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://whisper:8000/v1/audio/transcriptions",
+                "sendBody": true,
+                "contentType": "multipart-form-data",
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "response_format",
+                            "value": "verbose_json"
+                        },
+                        {
+                            "name": "timestamp_granularities[]",
+                            "value": "word"
+                        }
+                    ]
+                },
+                "options": {
+                    "timeout": 60000
+                }
+            },
+            "id": "10",
+            "name": "Whisper Align",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                2240,
+                200
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "jsCode": "const shots = $node['Parse Director Plan'].json.shots || [];\nconst whisperWords = items[0].json.words || [];\n// Use last word end time as true duration\nconst trueDuration = whisperWords.length > 0 ? whisperWords[whisperWords.length - 1].end : 60;\nconst fps = 30;\nconst normalize = (str) => str.replace(/[^\\u4e00-\\u9fa5a-zA-Z0-9]/g, '');\n\nconst charTimeStream = [];\nwhisperWords.forEach(w => {\n  const cleanWord = normalize(w.word);\n  if (!cleanWord) return;\n  const charDuration = (w.end - w.start) / cleanWord.length;\n  for (let i = 0; i < cleanWord.length; i++) {\n    charTimeStream.push({ char: cleanWord[i], end: w.start + (i + 1) * charDuration });\n  }\n});\n\nconst totalFrames = Math.ceil(trueDuration * fps);\nlet cursor = 0;\nconst clips = [];\n\nclips.push({ id: 'avatar_base', type: 'video', src: '/opt/mcn/assets/temp/avatar_full.mp4', startFrame: 0, durationInFrames: totalFrames, layer: 0, volume: 1 });\n\nshots.forEach((shot) => {\n  const cleanScript = normalize(shot.text || '');\n  const shotLength = cleanScript.length;\n  if (shotLength === 0 || cursor >= charTimeStream.length) return;\n  const startIdx = Math.min(cursor, charTimeStream.length - 1);\n  const endIdx = Math.min(cursor + shotLength - 1, charTimeStream.length - 1);\n  const startTime = cursor === 0 ? 0 : (charTimeStream[startIdx - 1]?.end || 0);\n  const endTime = charTimeStream[endIdx]?.end || trueDuration;\n  if (shot.visual_type === 'B-Roll') {\n    clips.push({ id: 'b_roll_' + shot.id, type: 'video', src: '/opt/mcn/assets/temp/b_roll_' + shot.id + '.mp4', startFrame: Math.round(startTime * fps), durationInFrames: Math.round((endTime - startTime) * fps), layer: 10, volume: 0 });\n  }\n  cursor += shotLength;\n});\n\nclips.push({ id: 'main_audio', type: 'audio', src: $node['Save Audio'].json.fileName, startFrame: 0, durationInFrames: totalFrames });\n\nreturn [{ json: { timeline: { clips, durationInFrames: totalFrames, fps, width: 720, height: 1280 }, shots } }];"
+            },
+            "id": "11",
+            "name": "Build Timeline",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                2460,
+                200
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://172.17.0.1:8000/submit_task",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"task_type\": \"remotion_render\",\n  \"priority\": 100,\n  \"payload\": {\n    \"timeline\": {{ JSON.stringify($json.timeline) }},\n    \"output_filename\": \"video_{{ $now.toMillis() }}.mp4\"\n  }\n}"
+            },
+            "id": "12",
+            "name": "Submit Remotion",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                2680,
+                200
+            ],
+            "typeVersion": 4.2
+        },
+        {
+            "parameters": {
+                "jsCode": "return [{ json: { status: 'submitted', task_id: items[0].json.task_id, timeline: $node['Build Timeline'].json.timeline } }];"
+            },
+            "id": "13",
+            "name": "Return Result",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                2900,
+                200
+            ],
+            "typeVersion": 2
+        }
+    ],
+    "connections": {
+        "Webhook Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Artist DNA",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Artist DNA": {
+            "main": [
+                [
+                    {
+                        "node": "DeepSeek Writer",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "DeepSeek Writer": {
+            "main": [
+                [
+                    {
+                        "node": "Extract Script",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extract Script": {
+            "main": [
+                [
+                    {
+                        "node": "DeepSeek Director",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "DeepSeek Director": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Director Plan",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Director Plan": {
+            "main": [
+                [
+                    {
+                        "node": "CosyVoice TTS",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "CosyVoice TTS": {
+            "main": [
+                [
+                    {
+                        "node": "Save Audio",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Save Audio": {
+            "main": [
+                [
+                    {
+                        "node": "FFprobe Duration",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "FFprobe Duration": {
+            "main": [
+                [
+                    {
+                        "node": "Whisper Align",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Whisper Align": {
+            "main": [
+                [
+                    {
+                        "node": "Build Timeline",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Build Timeline": {
+            "main": [
+                [
+                    {
+                        "node": "Submit Remotion",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Submit Remotion": {
+            "main": [
+                [
+                    {
+                        "node": "Return Result",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "staticData": null,
+    "tags": [],
+    "triggerCount": 0,
+    "active": false
+}

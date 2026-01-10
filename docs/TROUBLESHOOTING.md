@@ -50,6 +50,39 @@ Quick reference for common issues across all subsystems.
 
 ---
 
+## CosyVoice Issues
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| **Trembling/shaky audio** | ONNX CPU fallback, low n_timesteps | Use `cosyvoice:v3-vpn` image |
+| "libcudnn.so.9 not found" | cuDNN 9 not installed | Add `nvidia-cudnn-cu12` to Dockerfile |
+| "Invalid file: tensor" | CosyVoice3 expects path not tensor | Patch `server.py` to save temp file |
+| "HFValidationError" | Empty `qwen_pretrain_path` | Set path in `cosyvoice3.yaml` |
+| Wrong class loaded | `cosyvoice.yaml` symlink present | Remove symlink, keep only `cosyvoice3.yaml` |
+| "ruamel-yaml" error | Version conflict | Pin `ruamel.yaml<0.18` |
+| "ModuleNotFoundError x_transformers" | Missing dependency | Add `x-transformers` to Dockerfile |
+| Docker build fails GitHub | GFW network block | Use VPN + `--network=host` |
+
+### CosyVoice Quick Fixes
+```bash
+# Check if CUDA provider is working
+docker exec mcn_cosyvoice python3 -c "import onnxruntime as ort; print(ort.get_available_providers())"
+
+# Test audio generation
+docker exec mcn_cosyvoice python3 -c "
+import requests
+files = {
+    'tts_text': (None, '<|endofprompt|>Hello test'),
+    'prompt_text': (None, 'You are a helpful assistant.<|endofprompt|>希望你以后能够做的比我还好呦。'),
+    'prompt_wav': ('p.wav', open('/opt/CosyVoice/asset/zero_shot_prompt.wav', 'rb'), 'audio/wav')
+}
+r = requests.post('http://localhost:50000/inference_zero_shot', files=files)
+print(f'Status: {r.status_code}, Size: {len(r.content)} bytes')
+"
+```
+
+---
+
 ## Sanity Issues
 
 | Symptom | Cause | Solution |

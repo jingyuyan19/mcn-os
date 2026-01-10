@@ -42,10 +42,6 @@ const deskStructure = (S: any) =>
                                 .title('衣橱')
                                 .child(S.documentTypeList('wardrobe').title('衣橱')),
                             S.listItem()
-                                .id('studio-list-item')
-                                .title('摄影棚')
-                                .child(S.documentTypeList('studio').title('摄影棚')),
-                            S.listItem()
                                 .id('source-list-item')
                                 .title('情报源')
                                 .child(S.documentTypeList('source').title('情报源')),
@@ -73,7 +69,7 @@ const deskStructure = (S: any) =>
             S.divider(),
             // Quick access to all documents
             ...S.documentTypeListItems().filter(
-                (listItem: any) => !['artist', 'voice', 'wardrobe', 'studio', 'source', 'schedule', 'post'].includes(listItem.getId())
+                (listItem: any) => !['artist', 'voice', 'wardrobe', 'source', 'schedule', 'post'].includes(listItem.getId())
             ),
         ])
 

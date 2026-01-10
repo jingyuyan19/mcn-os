@@ -1,0 +1,122 @@
+{
+    "1": {
+        "inputs": {
+            "unet_name": "LongCat/LongCat-Avatar_fp8.safetensors",
+            "weight_dtype": "fp8_e4m3fn"
+        },
+        "class_type": "WanVideoModelLoader"
+    },
+    "2": {
+        "inputs": {
+            "vae_name": "Wan2_1_VAE_bf16.safetensors"
+        },
+        "class_type": "WanVideoVAELoader"
+    },
+    "3": {
+        "inputs": {
+            "lora_name": "WanVideo/LongCat_distill_lora_alpha64_bf16.safetensors",
+            "strength": 1.0,
+            "model": [
+                "1",
+                0
+            ]
+        },
+        "class_type": "WanVideoLoraSelect"
+    },
+    "4": {
+        "inputs": {
+            "image": "{{FACE_IMAGE_PATH}}",
+            "upload": "image"
+        },
+        "class_type": "LoadImage"
+    },
+    "5": {
+        "inputs": {
+            "audio": "{{AUDIO_PATH}}",
+            "upload": "audio"
+        },
+        "class_type": "LoadAudio"
+    },
+    "6": {
+        "inputs": {
+            "model": [
+                "3",
+                0
+            ],
+            "image": [
+                "4",
+                0
+            ],
+            "audio": [
+                "5",
+                0
+            ]
+        },
+        "class_type": "WanVideoLongCatAvatarExtendEmbeds"
+    },
+    "7": {
+        "inputs": {
+            "seed": "{{SEED}}",
+            "steps": 20,
+            "cfg": 5.0,
+            "shift": 3.0,
+            "model": [
+                "3",
+                0
+            ],
+            "positive": [
+                "6",
+                0
+            ],
+            "samples": [
+                "9",
+                0
+            ]
+        },
+        "class_type": "WanVideoSampler"
+    },
+    "8": {
+        "inputs": {
+            "samples": [
+                "7",
+                0
+            ],
+            "vae": [
+                "2",
+                0
+            ]
+        },
+        "class_type": "WanVideoDecode"
+    },
+    "9": {
+        "inputs": {
+            "width": 720,
+            "height": 720,
+            "length": 81,
+            "model": [
+                "3",
+                0
+            ],
+            "image": [
+                "4",
+                0
+            ]
+        },
+        "class_type": "WanImageToVideo"
+    },
+    "10": {
+        "inputs": {
+            "frame_rate": 25,
+            "filename_prefix": "longcat_{{TASK_ID}}",
+            "audio": [
+                "5",
+                0
+            ],
+            "images": [
+                "8",
+                0
+            ]
+        },
+        "class_type": "VHS_VideoCombine"
+    }
+}

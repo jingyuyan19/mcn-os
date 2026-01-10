@@ -1,0 +1,113 @@
+{
+    "1": {
+        "inputs": {
+            "unet_name": "wan2.2_ti2v_5B_fp16.safetensors",
+            "weight_dtype": "fp16"
+        },
+        "class_type": "WanVideoModelLoader"
+    },
+    "2": {
+        "inputs": {
+            "vae_name": "Wan2_1_VAE_bf16.safetensors"
+        },
+        "class_type": "WanVideoVAELoader"
+    },
+    "3": {
+        "inputs": {
+            "image": "{{IMAGE_PATH}}",
+            "upload": "image"
+        },
+        "class_type": "LoadImage"
+    },
+    "5": {
+        "inputs": {
+            "text": "{{MOTION_PROMPT}}",
+            "clip": [
+                "10",
+                0
+            ]
+        },
+        "class_type": "WanVideoTextEncode"
+    },
+    "6": {
+        "inputs": {
+            "seed": "{{SEED}}",
+            "steps": 20,
+            "cfg": 5.0,
+            "shift": 3.0,
+            "model": [
+                "1",
+                0
+            ],
+            "positive": [
+                "5",
+                0
+            ],
+            "negative": [
+                "7",
+                0
+            ],
+            "samples": [
+                "11",
+                0
+            ]
+        },
+        "class_type": "WanVideoSampler"
+    },
+    "7": {
+        "inputs": {
+            "text": "low quality, blurry, distorted",
+            "clip": [
+                "10",
+                0
+            ]
+        },
+        "class_type": "WanVideoTextEncode"
+    },
+    "8": {
+        "inputs": {
+            "samples": [
+                "6",
+                0
+            ],
+            "vae": [
+                "2",
+                0
+            ]
+        },
+        "class_type": "WanVideoDecode"
+    },
+    "9": {
+        "inputs": {
+            "frame_rate": 24,
+            "filename_prefix": "wan_i2v_{{TASK_ID}}",
+            "images": [
+                "8",
+                0
+            ]
+        },
+        "class_type": "VHS_VideoCombine"
+    },
+    "10": {
+        "inputs": {
+            "clip_name": "umt5_xxl_fp8_e4m3fn.safetensors"
+        },
+        "class_type": "LoadWanVideoClipTextEncoder"
+    },
+    "11": {
+        "inputs": {
+            "width": 720,
+            "height": 480,
+            "length": 81,
+            "model": [
+                "1",
+                0
+            ],
+            "image": [
+                "3",
+                0
+            ]
+        },
+        "class_type": "WanImageToVideo"
+    }
+}

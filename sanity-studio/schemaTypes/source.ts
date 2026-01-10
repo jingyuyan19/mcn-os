@@ -36,6 +36,28 @@ export default {
             type: 'url',
             validation: (Rule: any) => Rule.uri({ scheme: ['http', 'https'] }).required()
         },
+        // 🔀 Phase 10: Platform Routing
+        {
+            name: 'platform',
+            title: '平台类型',
+            type: 'string',
+            options: {
+                list: [
+                    { title: '🌐 网页 (Markdown)', value: 'web' },
+                    { title: '📺 YouTube (Transcript)', value: 'youtube' },
+                    { title: '🐦 Twitter/X (Screenshot)', value: 'twitter' },
+                    { title: '📰 RSS Feed', value: 'rss' }
+                ]
+            },
+            initialValue: 'web',
+            description: '决定使用哪条抓取管道 (Pipeline Router)'
+        },
+        {
+            name: 'rsshub_route',
+            title: 'RSSHub 路由',
+            type: 'string',
+            description: 'YouTube: @ChannelID, Twitter: Username. 用于 RSSHub 订阅。'
+        },
         {
             name: 'extraction_config',
             title: '提取策略',

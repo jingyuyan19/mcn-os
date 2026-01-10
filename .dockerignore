@@ -1,0 +1,36 @@
+# Docker build ignore file
+# Exclude data directories and large files
+
+# Database and state
+postgres/
+redis/
+n8n/
+
+# Large assets (mounted separately)
+assets/
+visual/
+
+# Node modules and build artifacts
+node_modules/
+rendering/node_modules/
+sanity-studio/node_modules/
+.next/
+
+# Git
+.git/
+
+# Docker build cache
+docker/*/build/
+
+# Logs
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/

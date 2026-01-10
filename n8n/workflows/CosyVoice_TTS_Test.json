@@ -1,0 +1,179 @@
+{
+    "name": "CosyVoice TTS Test",
+    "nodes": [
+        {
+            "parameters": {},
+            "id": "start-node",
+            "name": "Manual Trigger",
+            "type": "n8n-nodes-base.manualTrigger",
+            "typeVersion": 1,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "text",
+                            "name": "tts_text",
+                            "value": "欢迎使用CosyVoice语音合成系统，这是一个测试。",
+                            "type": "string"
+                        },
+                        {
+                            "id": "prompt_text",
+                            "name": "prompt_text",
+                            "value": "你好，这是参考音频的文字内容。",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "set-text",
+            "name": "Set TTS Text",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                460,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://mcn_asset_server/assets/zero_shot_prompt.wav",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "file"
+                        }
+                    }
+                }
+            },
+            "id": "get-prompt-audio",
+            "name": "Get Prompt Audio",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                680,
+                300
+            ],
+            "notes": "Download a reference voice sample from asset server"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://mcn_cosyvoice:50000/inference_zero_shot",
+                "sendBody": true,
+                "contentType": "multipart-form-data",
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "parameterType": "formData",
+                            "name": "tts_text",
+                            "value": "={{ $('Set TTS Text').item.json.tts_text }}"
+                        },
+                        {
+                            "parameterType": "formData",
+                            "name": "prompt_text",
+                            "value": "={{ $('Set TTS Text').item.json.prompt_text }}"
+                        },
+                        {
+                            "parameterType": "formBinaryData",
+                            "name": "prompt_wav",
+                            "inputDataFieldName": "data"
+                        }
+                    ]
+                },
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "file"
+                        }
+                    },
+                    "timeout": 120000
+                }
+            },
+            "id": "cosyvoice-tts",
+            "name": "CosyVoice TTS",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                900,
+                300
+            ],
+            "notes": "Call CosyVoice zero-shot TTS API"
+        },
+        {
+            "parameters": {
+                "operation": "write",
+                "fileName": "/opt/mcn/assets/output/cosyvoice_n8n_test.wav",
+                "dataPropertyName": "data"
+            },
+            "id": "save-audio",
+            "name": "Save Audio",
+            "type": "n8n-nodes-base.readWriteFile",
+            "typeVersion": 1,
+            "position": [
+                1120,
+                300
+            ],
+            "notes": "Save generated audio to assets folder"
+        }
+    ],
+    "connections": {
+        "Manual Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Set TTS Text",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Set TTS Text": {
+            "main": [
+                [
+                    {
+                        "node": "Get Prompt Audio",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get Prompt Audio": {
+            "main": [
+                [
+                    {
+                        "node": "CosyVoice TTS",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "CosyVoice TTS": {
+            "main": [
+                [
+                    {
+                        "node": "Save Audio",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "staticData": null,
+    "tags": [],
+    "triggerCount": 0
+}

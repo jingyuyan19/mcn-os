@@ -1,0 +1,154 @@
+{
+    "name": "6_LongCat_Test",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "longcat-test",
+                "responseMode": "lastNode",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                0,
+                0
+            ],
+            "id": "webhook-trigger",
+            "name": "Webhook"
+        },
+        {
+            "parameters": {
+                "url": "https://4t6f8tmh.api.sanity.io/v2024-01-01/data/query/production",
+                "sendQuery": true,
+                "queryParameters": {
+                    "query": "*[_type == \"artist\" && name == \"TestAlpha\"][0] { \n    \"face_url\": master_visuals.face_anchor.asset->url,\n    \"voice_audio\": voice->sample_audio.asset->url\n  }"
+                },
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpHeaderAuth",
+                "headerAuthId": {
+                    "__rl": true,
+                    "value": "sanity_auth",
+                    "mode": "id"
+                }
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                200,
+                0
+            ],
+            "id": "get-sanity-assets",
+            "name": "Get Sanity Assets"
+        },
+        {
+            "parameters": {
+                "url": "={{ $json.result.face_url }}",
+                "responseFormat": "file",
+                "fileName": "test_face.jpg"
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                400,
+                0
+            ],
+            "id": "download-face",
+            "name": "Download Face"
+        },
+        {
+            "parameters": {
+                "fileName": "/home/jimmy/Documents/mcn/visual/ComfyUI/input/test_face.jpg",
+                "dataPropertyName": "data"
+            },
+            "type": "n8n-nodes-base.writeBinaryFile",
+            "typeVersion": 1,
+            "position": [
+                600,
+                0
+            ],
+            "id": "save-face",
+            "name": "Save Face to Input"
+        },
+        {
+            "parameters": {
+                "url": "={{ $json.result.voice_audio }}",
+                "responseFormat": "file",
+                "fileName": "test_audio.wav"
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                400,
+                200
+            ],
+            "id": "download-audio",
+            "name": "Download Audio"
+        },
+        {
+            "parameters": {
+                "fileName": "/home/jimmy/Documents/mcn/visual/ComfyUI/input/test_audio.wav",
+                "dataPropertyName": "data"
+            },
+            "type": "n8n-nodes-base.writeBinaryFile",
+            "typeVersion": 1,
+            "position": [
+                600,
+                200
+            ],
+            "id": "save-audio",
+            "name": "Save Audio to Input"
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Get Sanity Assets",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get Sanity Assets": {
+            "main": [
+                [
+                    {
+                        "node": "Download Face",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Download Audio",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Download Face": {
+            "main": [
+                [
+                    {
+                        "node": "Save Face to Input",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Download Audio": {
+            "main": [
+                [
+                    {
+                        "node": "Save Audio to Input",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

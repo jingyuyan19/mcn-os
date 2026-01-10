@@ -57,6 +57,7 @@ cd ..
 
 ```
 Sanity Project ID: 4t6f8tmh
+Sanity Account: sipahiro@gmail.com
 DeepSeek API: sk-4756665d490f43d59223ab9567be34c8
 ```
 

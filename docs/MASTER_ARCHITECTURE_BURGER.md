@@ -1,19 +1,20 @@
 # 🏗️ Digital MCN OS - Master Architecture
 
-**Version**: 1.0 (Post-Phase 7)
-**Status**: Live / In Development
+**Version**: 1.1 (Phase 10: Production Hardening)  
+**Last Updated**: 2026-01-07  
+**Status**: Live / Production Ready  
 **Repository**: `https://github.com/jingyuyan19/mcn-os.git`
 
 ---
 
 ## 1. 🧩 System Overview: The "Burger Model"
 
-The system is a "Virtual Artist ERP" designed to automate video production using a Control Plane (Sanity), an Orchestrator (n8n), and a GPU Factory (ComfyUI/Middleware).
+The system is a "Virtual Artist ERP" designed to automate video production using a Control Plane (Sanity), an AI Brain (n8n + DeepSeek), and a GPU Factory (ComfyUI/CosyVoice/Remotion).
 
 ```mermaid
 graph TD
     User((User)) -->|Manage| A[Sanity CMS (Control Plane)]
-    A -->|Webhook| B[n8n (Orchestrator)]
+    A -->|Webhook| B[n8n + DeepSeek (Brain)]
     
     subgraph "Infrastructure (Hybrid Monorepo)"
         B -->|HTTP Task| C[Python Middleware]
@@ -40,12 +41,13 @@ graph TD
 /mcn/
 ├── sanity-studio/       # Control Plane (TypeScript)
 ├── n8n/                 # Orchestration (Workflow JSONs)
-│   ├── workflows/       # 1_Schedule, 2_Post, 3_Renderer
+│   ├── workflows/       # 1_Schedule, 2_Post, 3_Renderer, Orchestrator
 ├── middleware/          # GPU Factory Integration (Python)
 │   ├── server.py        # FastAPI Producer
 │   ├── worker.py        # Background Consumer
 │   └── lib/             # ComfyDriver, RedisClient
-├── remotion-project/    # [Phase 8] Intelligent Render Engine
+├── rendering/           # Remotion Render Engine
+├── docker/              # Dockerfiles (CosyVoice, etc.)
 ├── scripts/             # DevOps (Backup, Setup)
 └── assets/              # Shared Volume (Generated Media)
 ```
@@ -54,54 +56,87 @@ graph TD
 
 ## 3. 🧠 Component Details
 
-### 3.1 Control Plane (Sanity CMS)
+### 3.1 Control Plane (Sanity CMS) ✅
 *   **Role**: ERP for Artists, Schedules, and Production Orders.
-*   **Key Schemas**:
-    *   `artist.ts`: Defines character DNA and visual masters.
-    *   `schedule.ts`: Visual timeline for automated trigger rules.
-    *   `post.ts`: The "Storyboard" - contains shot-by-shot data for the video.
+*   **Key Schemas**: `artist`, `schedule`, `post`, `voice`, `wardrobe`, `studio`, `source`, `prompt_config`
 *   **Unique Features**:
     *   GROQ Filters for wardrobe validation.
     *   "Locked" shots (preserves human edits during AI regeneration).
 
-### 3.2 Orchestrator (n8n)
-*   **Role**: Logic Glue. Connects Sanity, DeepSeek, and GPU.
-*   **Workflows**:
-    *   `1_Schedule_Poller`: Runs cron -> Creates `Draft` Posts.
-    *   `2_Post_Generator`: Calls DeepSeek -> Writes Storyboard to Sanity.
-    *   `3_Video_Renderer`: Polls Middleware -> Updates Sanity Status.
+### 3.2 Brain (n8n + DeepSeek V3) ✅
+*   **Role**: Chain-of-Thought AI Pipeline.
+*   **Stages**:
+    1. **Analyst**: Extract key facts → Intelligence JSON
+    2. **Writer**: Apply persona → Script Array
+    3. **Director**: Plan visuals → Visual Prompts
+    4. **Editor**: Calculate timings → Timeline JSON
+*   **Workflow**: `3_Orchestrator_V8_8.json`
 
-### 3.3 GPU Factory (Middleware V8.0)
+### 3.3 GPU Factory (Middleware V8.5) ✅
 *   **Role**: Async Task Processing for Hardware.
 *   **Architecture**:
     *   **API**: FastAPI (`server.py`) - Lightweight, non-blocking.
     *   **Queue**: Redis (List: `task_queue`, Hash: `tasks:{id}`).
-    *   **Worker**: `worker.py` - Single-threaded consumer (prevents GPU VRAM collision).
+    *   **Worker**: `worker.py` - Single-threaded consumer.
 *   **Features**:
     *   **Template Injection**: Replaces `{{KEY}}` in ComfyUI JSONs.
-    *   **VRAM Management**: Aggressive garbage collection between tasks.
-    *   **Smart Polling**: n8n polls status, avoiding HTTP timeout issues.
+    *   **VRAM Management**: Aggressive garbage collection.
+    *   **GPU Lock**: Prevents VRAM collision.
+
+### 3.4 Voice Engine (CosyVoice v3) ✅ **NEW**
+*   **Role**: Zero-shot voice cloning TTS.
+*   **Docker Image**: `cosyvoice:v3-vpn` (Golden Environment)
+*   **API**: `POST /inference_zero_shot` (multipart/form-data)
+*   **Languages**: English + Chinese verified working
+*   **Status**: Trembling audio issue **RESOLVED** (2026-01-07)
+
+### 3.5 Render Engine (Remotion) ✅
+*   **Role**: JSON-to-MP4 video composition.
+*   **File**: `rendering/src/Composition.tsx`
+*   **Driver**: `middleware/lib/remotion_driver.py`
 
 ---
 
 ## 4. 🚀 Deployment & DevOps
 
-### 4.1 Networking
-*   **n8n (Docker)** -> **Host**: `http://172.17.0.1:8000`
-*   **Sanity Cloud** -> **n8n**: Requires Public URL (or manual trigger for dev).
-*   **Remotion** -> **Assets**: `http://localhost:8081/assets/` (via Nginx).
+### 4.1 Service Endpoints
+| Service | URL | Status |
+|---------|-----|--------|
+| n8n | http://localhost:5678 | ✅ Docker |
+| Sanity Studio | http://localhost:3333 | ✅ Local |
+| Middleware API | http://localhost:8000 | ✅ Host |
+| CosyVoice | http://localhost:50000 | ✅ Docker |
+| Asset Server | http://localhost:8081 | ✅ Docker |
+| ComfyUI | http://localhost:8188 | ✅ Host |
 
 ### 4.2 Disaster Recovery
 *   **Scripts**:
     *   `backup_n8n.sh`: Exports workflows and credentials.
-    *   `setup_models.sh`: Symlinks large models from `~/.cache` to avoid Git bloat.
+    *   `setup_models.sh`: Symlinks large models from `~/.cache`.
 *   **Git Strategy**:
     *   `models/` ignored.
     *   `.gitattributes` tracks `*.mp4`, `*.png` (LFS).
+*   **Docker data-root**: `/mnt/data_ssd/docker-data` (SSD)
 
 ---
 
-## 5. 🔮 Future Roadmap (Phase 8+)
-*   **Remotion Engine**: CPU-based video assembler (React).
-*   **DeepSeek Director**: LLM outputting accurate Timeline JSONs.
-*   **Nginx Asset Server**: Serving local assets to the headless renderer.
+## 5. ✅ Completed Phases
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Infrastructure & Atomic Units | ✅ Complete |
+| 2 | Complex Chains (LongCat) | ✅ Complete |
+| 3 | Middleware Layer | ✅ Complete |
+| 4-5 | n8n Automation & DevOps | ✅ Complete |
+| 6-7 | GPU Integration & E2E Test | ✅ Complete |
+| 8 | Remotion Engine | ✅ Complete |
+| 9 | DeepSeek Brain MVP | ✅ Complete |
+| 10 | CosyVoice Golden Environment | ✅ Complete |
+
+---
+
+## 6. 🔮 Future Roadmap
+
+*   **Commercial**: Social media API integration (TikTok, YouTube)
+*   **Distribution**: CDN asset serving, multi-region deployment
+*   **Scaling**: GPU cluster support, queue prioritization
