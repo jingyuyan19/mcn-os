@@ -19,11 +19,27 @@ services:
     image: redis:7-alpine
     container_name: mcn_redis
     restart: always
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass 123456
     volumes:
       - ./redis:/data
     ports:
       - "6379:6379"
+    networks:
+      - mcn_network
+
+  # --- Database Layer (MediaCrawlerPro) ---
+  mysql:
+    image: mysql:8.0
+    container_name: mcn_mysql
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456
+      - MYSQL_DATABASE=media_crawler_pro
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - ./mysql:/var/lib/mysql
+    ports:
+      - "3306:3306"
     networks:
       - mcn_network
 
@@ -68,6 +84,80 @@ services:
     depends_on:
       - postgres
       - redis
+    networks:
+      - mcn_network
+
+  # --- MCN Core Layer (The Citadel) ---
+  mcn-core:
+    build:
+      context: .
+      dockerfile: docker/mcn-core.Dockerfile
+    container_name: mcn_core
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./external/BettaFish/.env
+      - ./middleware/.env
+    environment:
+      # Docker Infrastructure Overrides (Highest Priority)
+      - MYSQL_HOST=mysql
+      - REDIS_URL=redis://:123456@redis:6379/0
+      - CRAWLER_URL=http://mediacrawler:8001
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Code Hot-Reload: Host edits reflect instantly
+      - ./middleware:/app/middleware
+      - ./external/BettaFish:/app/external/BettaFish
+      - ./external/Vidi:/app/external/Vidi
+      # Shared Data (Bind Mounts)
+      - /mnt/data_ssd/mcn/reports:/app/reports
+    shm_size: '2gb'
+    depends_on:
+      - mysql
+      - redis
+      - signsrv
+    networks:
+      - mcn_network
+
+  # --- Signature Server (XHS/Douyin) ---
+  signsrv:
+    build: ./external/MediaCrawlerPro-SignSrv
+    container_name: mcn_signsrv
+    restart: unless-stopped
+    ports:
+      - "8989:8989"
+    shm_size: '2gb'
+    networks:
+      - mcn_network
+
+  # --- Media Crawler Container ---
+  mediacrawler:
+    build: ./external/MediaCrawlerPro-Python
+    container_name: mcn_mediacrawler
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      # MediaCrawlerPro uses RELATION_DB_* for MySQL and REDIS_DB_* for Redis
+      - RELATION_DB_HOST=mysql
+      - RELATION_DB_PORT=3306
+      - RELATION_DB_USER=root
+      - RELATION_DB_PWD=123456
+      - RELATION_DB_NAME=media_crawler_pro
+      - REDIS_DB_HOST=redis
+      - REDIS_DB_PORT=6379
+      - REDIS_DB_PWD=123456
+      # SignSrv connection (uses config.SIGN_SRV_HOST)
+      - SIGN_SRV_HOST=signsrv
+      - SIGN_SRV_PORT=8989
+    volumes:
+      - ./external/MediaCrawlerPro-Python:/app
+    shm_size: '2gb'
+    depends_on:
+      - mysql
+      - redis
+      - signsrv
     networks:
       - mcn_network
 
@@ -199,6 +289,62 @@ services:
       - /mnt/data_ssd/ollama:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_KEEP_ALIVE=5m # Keep models warm for 5 min, evict via API when needed
+    networks:
+      - mcn_network
+
+  # --- Visual Layer (ComfyUI) - Start with: docker-compose --profile art up -d ---
+  comfyui:
+    image: yanwk/comfyui-boot:latest
+    container_name: mcn_comfyui
+    restart: unless-stopped
+    profiles:
+      - art
+      - full
+    ports:
+      - "8188:8188"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      # Bind mount from SSD for models and outputs
+      - /mnt/data_ssd/ComfyUI/models:/app/ComfyUI/models
+      - /mnt/data_ssd/ComfyUI/output:/app/ComfyUI/output
+      - /mnt/data_ssd/ComfyUI/custom_nodes:/app/ComfyUI/custom_nodes
+    # Per Deep Think: --smart-memory + --cpu-vae to save VRAM
+    command: python main.py --listen --port 8188 --smart-memory --cpu-vae
+    shm_size: '2gb'
+    networks:
+      - mcn_network
+
+  # --- Memory Layer (Mem0 Vector Store) ---
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: mcn_qdrant
+    restart: always
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+    networks:
+      - mcn_network
+
+  # --- Observability Layer ---
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: mcn_dozzle
+    restart: always
+    ports:
+      - "8888:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - mcn_network
 

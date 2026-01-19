@@ -1,61 +1,67 @@
-# Digital MCN OS - Hybrid Monorepo Strategy (Refined)
+# Digital MCN OS - Git Version Control Strategy
 
-**Goal**: A sustainable version control system for a project mixing Production Code (TS/Python), Low-Code (n8n/ComfyUI), and Huge Assets (Models/Video).
+**Goal**: A sustainable version control system for a project mixing Production Code (TS/Python), Low-Code (n8n/ComfyUI), Docker Containers, and Huge Assets (Models/Video).
 
-**Core Philosophy**: "Code in Git, Logic in JSON, Models in Scripts, Assets in LFS."
+**Core Philosophy**: "Code in Git, Logic in JSON, Models in Scripts, Assets in LFS, Infrastructure as Code."
 
 ---
 
-## 1. 📂 Validated Directory Structure
+## 1. 📂 Directory Structure (Docker-First Architecture)
 
-We will adapt your current working directory `/home/jimmy/Documents/mcn` to be the Git Root.
+Git Root: `/home/jimmy/Documents/mcn`
 
 ```text
 /home/jimmy/Documents/mcn/  (Git Root)
 ├── .git/
-├── .gitignore               <-- 🛡️ Vital: Ignores 10GB+ folders
-├── .gitattributes           <-- 📦 LFS: Handles binary assets
-├── docker-compose.yml       <-- Infra as Code
+├── .gitignore               # 🛡️ Ignores 10GB+ folders
+├── .gitattributes           # 📦 LFS: Handles binary assets
+├── docker-compose.yml       # ⚙️ Main container definitions
+├── start_mcn_os.sh          # 🚀 Master startup script
 ├── README.md
 
-├── middleware/              # [Code] Python GPU Orchestration (FastAPI)
-│   ├── src/                 # (Move server.py key files here?)
-│   ├── workflows/           # ✅ TRACK: API JSONs for machine execution
-│   └── requirements.txt
-│
-├── sanity-studio/           # [Code] CMS Control Plane
+├── docker/                  # [NEW] Docker Build Files
+│   ├── mcn-core.Dockerfile  # ✅ TRACK: Middleware container
+│   └── requirements-core.txt # ✅ TRACK: Python dependencies
+
+├── middleware/              # [Code] Python API (Runs in mcn-core container)
+│   ├── lib/                 # Core libraries (gpu_manager.py, etc.)
+│   ├── server.py            # FastAPI entry point
+│   └── requirements.txt     # Native dev dependencies
+
+├── external/                # [External Projects] Bind-mounted into containers
+│   ├── BettaFish/           # ❌ IGNORE: Submodule or separate repo
+│   ├── MediaCrawlerPro-Python/      # ❌ IGNORE: Has own Dockerfile
+│   └── MediaCrawlerPro-SignSrv/     # ❌ IGNORE: Has own Dockerfile
+
+├── sanity-studio/           # [Code] CMS Control Plane (Native)
 │   ├── schemaTypes/
 │   └── sanity.config.ts
-│
+
 ├── rendering/               # [Code] Remotion Video Engine
 │   └── src/
-│
+
 ├── n8n/                     # [Config] Workflow Orchestration
 │   ├── workflows/           # ✅ TRACK: JSON backup of workflows
 │   └── .env                 # ❌ IGNORE: Secrets
-│
+
 ├── visual/                  # [Mixed] ComfyUI & Models
 │   ├── ComfyUI/             # ❌ IGNORE: The installation itself
-│   └── workflows/           # ✅ TRACK: "Source Code" for ComfyUI (UI Format)
-│       ├── flux_dev.json
-│       └── wan_dev.json
-│
+│   └── workflows/           # ✅ TRACK: ComfyUI JSON workflows
+
 ├── assets/                  # [Assets]
 │   ├── artists/             # 📦 LFS: Face anchors, voice samples
-│   ├── models/              # ❌ IGNORE: Checkpoints (Script it!)
 │   └── temp/                # ❌ IGNORE: Intermediate renders
-│
+
+├── .agent/                  # [Antigravity IDE]
+│   └── workflows/           # ✅ TRACK: Agent workflow docs
+
 └── scripts/                 # [Ops]
-    ├── setup_models.sh      # 📥 Symlink Strategy (Persistent Storage)
-    ├── setup_nodes.sh       # 🔌 Plugin Snapshot (Git Clone)
-    └── backup_n8n.sh        # 🔄 Dump n8n DB to JSON (Granular)
+    └── setup_models.sh      # 📥 Symlink Strategy
 ```
 
 ---
 
-## 2. 🛡️ The `.gitignore` Shield
-
-Create this file immediately to prevent accidental commits of massive files.
+## 2. 🛡️ The `.gitignore` (Updated for Docker)
 
 ```gitignore
 # --- 1. System & Dependencies ---
@@ -66,28 +72,37 @@ __pycache__/
 venv/
 *.log
 wget-log
+*.pid
 
 # --- 2. Secrets ---
 .env
+.env.*
 sanity-studio/.sanity/
 *private_key*
 
-# --- 3. Massive Installations (Repo-in-Repo) ---
-visual/ComfyUI/       # Ignored entirely! We rebuild via setup_nodes.sh
+# --- 3. External Projects (Separate Repos) ---
+external/BettaFish/
+external/MediaCrawlerPro-Python/
+external/MediaCrawlerPro-SignSrv/
+external/Vidi/
 CosyVoice/
-visual/active_test_output.wav
 
-# --- 4. Database Persistence (Docker Volumes) ---
+# --- 4. Large Installations ---
+visual/ComfyUI/
+middleware/venv/
+
+# --- 5. Database Persistence (Docker Volumes) ---
 postgres/
 redis/
+mysql/
+qdrant_storage/
 n8n/binaryData/
 n8n/git/
 n8n/ssh/
 n8n/config
 n8n/nodes
 
-# --- 5. Massive Assets ---
-# We track specific assets via LFS, ignore the rest
+# --- 6. Massive Assets ---
 assets/models/
 assets/temp/
 outputs/
@@ -95,16 +110,15 @@ outputs/
 *.ckpt
 *.pth
 
-# --- 6. Exceptions (Whitelist) ---
+# --- 7. Exceptions (Whitelist) ---
 !assets/.gitkeep
 !n8n/workflows/*.json
+!docker/
 ```
 
 ---
 
 ## 3. 📦 Git LFS (Large File Storage)
-
-Don't bloat the repo history. Store pointers instead of blobs.
 
 ```bash
 # Initialize
@@ -113,9 +127,7 @@ git lfs install
 # Configure Tracking (.gitattributes)
 git lfs track "assets/artists/**/*.png"
 git lfs track "assets/artists/**/*.wav"
-git lfs track "assets/sponsorships/**/*.pdf"
 git lfs track "assets/**/*.psd"
-git lfs track "assets/**/*.ai"
 
 # Commit configuration
 git add .gitattributes
@@ -123,30 +135,65 @@ git add .gitattributes
 
 ---
 
-## 4. 🧩 Low-Code Versioning Workflow
+## 4. 🐳 Docker Infrastructure as Code
 
-### A. ComfyUI (The "Source vs Build" problem)
-ComfyUI workflows are code.
-*   **Action**: Create `visual/workflows/` directory.
-*   **Source Truth**: `visual/workflows/[name]_edit.json` (The .json with UI nodes)
-*   **Build Truth**: `middleware/workflows/[name]_api.json` (The API export for automation)
-*   **Plugins**: Managed via `scripts/setup_nodes.sh`.
+Key files to always track:
 
-### B. n8n (The Database problem)
-n8n workflows live in SQLite.
-*   **Strategy**: Granular Backup.
-*   **Script**: `scripts/backup_n8n.sh` generates individual JSON files for each workflow.
-*   **Commit**: `n8n/workflows/*.json`
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml` | All container definitions |
+| `docker/mcn-core.Dockerfile` | Middleware + BettaFish container |
+| `docker/requirements-core.txt` | Python dependencies |
+| `start_mcn_os.sh` | Master startup script |
+
+### Commit Docker Changes
+
+```bash
+git add docker-compose.yml docker/ start_mcn_os.sh
+git commit -m "feat(docker): update container configuration"
+```
 
 ---
 
-## 5. 🐘 Model Management (Symlink Strategy)
+## 5. 🧩 Low-Code Versioning
 
-We separate **Asset Persistence** from **Runtime Execution**.
+### ComfyUI Workflows
+- **Location**: `visual/workflows/*.json`
+- **Track**: JSON workflow files
 
-1.  **Storage**: `assets/models/checkpoints/` (Persistent, ignored)
-2.  **Runtime**: `visual/ComfyUI/models/checkpoints/` (ignored)
-3.  **Link**: `scripts/setup_models.sh` creates the symlink.
+### n8n Workflows
+- **Location**: `n8n/workflows/*.json`
+- **Track**: Exported workflow JSONs
+- **Script**: Use n8n's export feature
 
-If you wipe `visual/ComfyUI`, your models are safe in `assets/models`.
+### Antigravity Workflows
+- **Location**: `.agent/workflows/*.md`
+- **Track**: Agent documentation
 
+---
+
+## 6. 🔄 Common Git Commands
+
+```bash
+# Check status
+git status
+
+# Stage Docker changes
+git add docker-compose.yml docker/
+
+# Commit with conventional format
+git commit -m "feat(docker): add ComfyUI container with profile"
+git commit -m "fix(middleware): update Redis URL for auth"
+
+# Push to GitHub
+git push origin main
+```
+
+---
+
+## 7. ⚠️ Important Notes
+
+1. **External projects**: BettaFish, MediaCrawlerPro are separate repos/submodules
+2. **Models**: Never commit .safetensors - use `scripts/setup_models.sh`
+3. **Secrets**: All .env files are gitignored
+4. **Docker volumes**: Database persistence folders are gitignored
