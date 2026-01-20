@@ -33,7 +33,16 @@ export default {
                     { title: '玄学', value: 'metaphysics' }
                 ]
             },
-            validation: (Rule: any) => Rule.required()
+            validation: (Rule: any) => Rule.required(),
+            description: '快速选择 - 使用下方赛道配置获取更多控制'
+        },
+        {
+            name: 'nicheConfig',
+            group: 'dna',
+            title: '赛道配置 (高级)',
+            type: 'reference',
+            to: [{ type: 'nicheConfig' }],
+            description: '关联赛道配置以启用关键词监控和自动爬取'
         },
         {
             name: 'backstory',
@@ -42,6 +51,44 @@ export default {
             type: 'text',
             rows: 4,
             description: '角色的背景故事、性格特点、说话风格等'
+        },
+        {
+            name: 'subtitle',
+            group: 'dna',
+            title: '副标题/定位',
+            type: 'string',
+            description: '如：科技数码达人、财经分析师'
+        },
+        {
+            name: 'voiceStyle',
+            group: 'dna',
+            title: '语言风格',
+            type: 'string',
+            options: {
+                list: [
+                    { title: '专业', value: 'professional' },
+                    { title: '轻松', value: 'casual' },
+                    { title: '幽默', value: 'humorous' },
+                    { title: '严肃', value: 'serious' }
+                ]
+            },
+            description: '内容输出的整体风格基调'
+        },
+        {
+            name: 'contentFocus',
+            group: 'dna',
+            title: '内容方向',
+            type: 'array',
+            of: [{ type: 'string' }],
+            description: '擅长的内容领域，如：手机评测、AI技术、股票分析'
+        },
+        {
+            name: 'excludeKeywords',
+            group: 'dna',
+            title: '排除关键词',
+            type: 'array',
+            of: [{ type: 'string' }],
+            description: '不适合此艺人的关键词，用于过滤选题'
         },
 
         // === Group 2: Visuals (一次性设计 - Midjourney/Nano Banana Pro) ===
@@ -117,6 +164,94 @@ export default {
                 // We'll validate this in n8n/middleware instead
             }],
             description: '日常监听的情报源'
+        },
+
+        // === Perception Layer v3.0: Dynamic Scoring Weights ===
+        {
+            name: 'scoringWeights',
+            group: 'config',
+            title: '⚖️ 选题评分权重',
+            type: 'object',
+            description: '控制选题排序算法中各因素的权重',
+            fields: [
+                {
+                    name: 'recency',
+                    title: '时效性权重',
+                    type: 'number',
+                    initialValue: 0.30,
+                    description: '新闻类艺人设高，教育类设低'
+                },
+                {
+                    name: 'relevance',
+                    title: '相关性权重',
+                    type: 'number',
+                    initialValue: 0.35,
+                    description: '与艺人定位的匹配度'
+                },
+                {
+                    name: 'source_priority',
+                    title: '来源权重',
+                    type: 'number',
+                    initialValue: 0.15,
+                    description: '优质来源（如一级媒体）的额外加成'
+                },
+                {
+                    name: 'novelty',
+                    title: '新颖度权重',
+                    type: 'number',
+                    initialValue: 0.20,
+                    description: '与已发布内容的差异度'
+                }
+            ]
+        },
+
+        // === Perception Layer v3.0: Knowledge Base Curriculum ===
+        {
+            name: 'knowledgeBase',
+            group: 'config',
+            title: '📚 知识库配置',
+            type: 'object',
+            description: '教育类艺人的知识库课程进度',
+            fields: [
+                {
+                    name: 'notebookId',
+                    title: 'Open Notebook ID',
+                    type: 'string',
+                    description: '关联的Open Notebook知识库ID'
+                },
+                {
+                    name: 'curriculumMode',
+                    title: '课程模式',
+                    type: 'boolean',
+                    initialValue: false,
+                    description: '启用系统化课程进度跟踪'
+                },
+                {
+                    name: 'curriculumProgress',
+                    title: '课程进度',
+                    type: 'array',
+                    of: [{
+                        type: 'object',
+                        fields: [
+                            { name: 'chapterId', title: '章节ID', type: 'string' },
+                            {
+                                name: 'status',
+                                title: '状态',
+                                type: 'string',
+                                options: {
+                                    list: [
+                                        { title: '待处理', value: 'pending' },
+                                        { title: '进行中', value: 'in_progress' },
+                                        { title: '已完成', value: 'completed' }
+                                    ]
+                                }
+                            },
+                            { name: 'videoId', title: '生成的视频', type: 'reference', to: [{ type: 'post' }] },
+                            { name: 'completedAt', title: '完成时间', type: 'datetime' }
+                        ]
+                    }]
+                }
+            ]
         }
     ],
     preview: {
