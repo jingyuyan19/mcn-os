@@ -57,3 +57,9 @@ Pillow>=9.5.0
 
 # 10. Sanity & External APIs
 tavily-python>=0.3.0
+qdrant-client>=1.7.0
+feedparser>=6.0.0
+
+# 11. GPU Management (GPU Manager V2)
+nvidia-ml-py>=12.560.30
+docker>=6.0.0

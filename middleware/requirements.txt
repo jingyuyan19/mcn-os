@@ -1,8 +1,18 @@
 fastapi
 uvicorn
 redis
-requests
+requests>=2.32.0
+certifi>=2026.1.4  # SSL CA certificates - keep updated for security
+urllib3>=2.0.0  # Required for retry logic
 torch
 websocket-client
 python-dotenv
 pydantic
+mem0ai
+pytest
+pytest-asyncio
+aiohttp
+aiomysql  # For async MySQL queries in media_downloader
+nvidia-ml-py>=12.560.30  # Official NVIDIA GPU monitoring for GPU Manager V2
+docker>=6.0.0  # Docker SDK for lifecycle manager
+httpx>=0.24.0  # Async HTTP client for health checks
